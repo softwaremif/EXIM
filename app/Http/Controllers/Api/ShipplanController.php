@@ -154,4 +154,45 @@ class ShipplanController extends Controller
     
         return response()->json(['rows' => $rows]);
     }
+
+
+    public function getListShipment(Request $request)
+    {
+        $year = (int) $request->query('year', 0);
+ 
+        $query = DB::table('export')
+            ->leftJoin('vassal', 'vassal.vassalpk', '=', 'export.vassalpk')
+            ->select('export.*', 'vassal.typenm');
+ 
+        if ($year > 0) {
+            $query->whereYear('export.exdate', $year);
+        }
+ 
+        $exports = $query
+            ->orderBy('export.exdate', 'desc')
+            ->orderBy('export.exportpk', 'desc')
+            ->get();
+ 
+        $contsByExport = $exports->isEmpty()
+            ? collect()
+            : DB::table('cont')
+                ->whereIn('exportpk', $exports->pluck('exportpk'))
+                ->orderBy('contno')
+                ->get(['contpk', 'exportpk', 'contno', 'type', 'actcontdate', 'start_ship', 'end_ship', 'segel'])
+                ->groupBy('exportpk');
+ 
+        $rows = $exports->map(function ($e) use ($contsByExport) {
+            $row = (array) $e;
+            $row['containers'] = ($contsByExport->get($e->exportpk) ?? collect())
+                ->map(fn ($c) => (array) $c)
+                ->values();
+            return $row;
+        })->values();
+ 
+        return response()->json([
+            'success' => true,
+            'total'   => $rows->count(),
+            'rows'    => $rows,
+        ]);
+    }
 }

@@ -157,3 +157,6 @@ Route::post('invoice-delete-excel/{invspk}', [ApiInvoiceController::class, 'Dele
 /*Shipment Plan*/
 Route::get('/getListExport', [ShipplanController::class, 'getListExport'])->name('api.shipplan.getListExport');
 Route::post('/updateShipment', [ShipplanController::class, 'updateShipment']);
+
+
+Route::get('/getListShipment', [ShipplanController::class, 'getListShipment']);
