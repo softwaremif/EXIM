@@ -170,6 +170,7 @@ class ShipplanController extends Controller
         }
  
         $exports = $query
+            ->whereNull('export.stscancel')
             ->orderBy('export.exdate', 'desc')
             ->orderBy('export.exportpk', 'desc')
             ->get();
