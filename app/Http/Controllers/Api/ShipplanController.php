@@ -162,7 +162,8 @@ class ShipplanController extends Controller
  
         $query = DB::table('export')
             ->leftJoin('vassal', 'vassal.vassalpk', '=', 'export.vassalpk')
-            ->select('export.*', 'vassal.typenm');
+            ->leftJoin('plb', 'plb.plbpk', '=', 'export.plbpk')
+            ->select('export.*', 'vassal.typenm', 'plb.plbnm');
  
         if ($year > 0) {
             $query->whereYear('export.exdate', $year);
@@ -178,7 +179,7 @@ class ShipplanController extends Controller
             : DB::table('cont')
                 ->whereIn('exportpk', $exports->pluck('exportpk'))
                 ->orderBy('contno')
-                ->get(['contpk', 'exportpk', 'contno', 'type', 'actcontdate', 'start_ship', 'end_ship', 'segel'])
+                ->get()                      
                 ->groupBy('exportpk');
  
         $rows = $exports->map(function ($e) use ($contsByExport) {
