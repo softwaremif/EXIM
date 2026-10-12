@@ -49,33 +49,33 @@ class Handler extends ExceptionHandler
      * @param  \Throwable  $exception
      * @return \Symfony\Component\HttpFoundation\Response
      */
-    public function render($request, Throwable $exception)
-    {
-        // Database terputus / query gagal (mis. koneksi DB down, maintenance)
-        if ($exception instanceof PDOException || $exception instanceof QueryException) {
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'message' => 'Server maintenance',
-                ], 503);
-            }
-            return response()->view('errors.db_maintenance', [], 503);
-        }
+    // public function render($request, Throwable $exception)
+    // {
+    //     // Database terputus / query gagal (mis. koneksi DB down, maintenance)
+    //     if ($exception instanceof PDOException || $exception instanceof QueryException) {
+    //         if ($request->expectsJson()) {
+    //             return response()->json([
+    //                 'message' => 'Server maintenance',
+    //             ], 503);
+    //         }
+    //         return response()->view('errors.db_maintenance', [], 503);
+    //     }
 
-        // Session/CSRF token expired saat login
-        if ($exception instanceof TokenMismatchException) {
-            $message = 'Session login timeout, silahkan reload halaman web.';
+    //     // Session/CSRF token expired saat login
+    //     if ($exception instanceof TokenMismatchException) {
+    //         $message = 'Session login timeout, silahkan reload halaman web.';
 
-            if ($request->expectsJson() || $request->ajax()) {
-                return response()->json([
-                    'message' => $message,
-                ], 419);
-            }
+    //         if ($request->expectsJson() || $request->ajax()) {
+    //             return response()->json([
+    //                 'message' => $message,
+    //             ], 419);
+    //         }
 
-            return redirect()->back()
-                ->withInput($request->except($this->dontFlash))
-                ->with('error', $message);
-        }
+    //         return redirect()->back()
+    //             ->withInput($request->except($this->dontFlash))
+    //             ->with('error', $message);
+    //     }
 
-        return parent::render($request, $exception);
-    }
+    //     return parent::render($request, $exception);
+    // }
 }

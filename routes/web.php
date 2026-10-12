@@ -167,6 +167,7 @@ Route::post('cancelinvs', [InvoiceController::class, 'cancelinvs'])->name('cance
     Route::post('/removeList', [ShipplanController::class, 'removeList'])->name('shipplan.removeList');
     Route::post('/exim-export/set_shipplan', [ShipplanController::class, 'set_shipplan'])->name('set_shipplan');
     Route::post('/exim-export/set_invs', [ShipplanController::class, 'set_invs'])->name('set_invs');
+    Route::post('/exim-export/set_peb', [ShipplanController::class, 'set_peb'])->name('set_peb');
     Route::get('/get-fwd', [ShipplanController::class, 'getFwd'])->name('getFwd');
     Route::get('/get-vassal', [ShipplanController::class, 'getVassal'])->name('getVassal');
     Route::get('/get-plb', [ShipplanController::class, 'getPlb'])->name('getPlb');
@@ -185,3 +186,14 @@ Route::post('cancelinvs', [InvoiceController::class, 'cancelinvs'])->name('cance
     Route::get('/exim-export/shipplan/{exportpk}/container-cards-refresh', [ShipplanController::class, 'refreshContainerCards'])->name('shipplan.containerCardsRefresh');
     Route::get('/containers/{contpk}/progress', [ShipplanController::class, 'containerProgress'])->name('containers.progress');
     Route::get('/export/si/{exportpk}', [ShipplanController::class, 'exportSI'])->name('exportSI');
+
+    //set invoice baru
+    Route::get('/invoice/options', [ShipplanController::class, 'invoiceOptions'])->name('invoice.options');
+    Route::get('/invoice/generate', [ShipplanController::class, 'generateInvoiceNumber'])->name('invoice.generate');
+
+    //hapus PO
+    Route::post('/export/po-delete', [ShipplanController::class, 'deletePo'])->name('export.po-delete');
+
+    //add PO
+    Route::get('/export/{exportpk}/available-po', [ShipplanController::class, 'availablePo'])->name('export.available-po');
+    Route::post('/export/po-add', [ShipplanController::class, 'addPo'])->name('export.po-add');   

@@ -207,13 +207,13 @@
                                 <input class="easyui-datebox mc-input" style="width:250px;height:40px;" id="etavess"
                                     name="etavess" data-options="formatter:myformatter,parser:myparser">
                             </div>
-                            <div class="col-md-6">
+                            {{-- <div class="col-md-6">
                                 <label class="mc-label"><i class="bi bi-file-text"></i> PEB Number</label>
                                 <div class="mc-input-suffix">
                                     <input type="text" name="pebno" id="pebno" class="mc-input"
                                         placeholder="cth. SL-88213">
                                 </div>
-                            </div>
+                            </div> --}}
 
                             <div class="mc-pane-toolbar mt-4">
                                 <div class="mc-pane-toolbar-text">

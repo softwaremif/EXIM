@@ -25,6 +25,9 @@ use Carbon\Carbon;
 
 class ShipplanController extends Controller
 {
+    private const PACK_BUYER_COL = 'buyer';
+    private const PO_BUYER_COL   = 'buyer';
+
     public function index()
     {
         return view(
@@ -60,6 +63,7 @@ class ShipplanController extends Controller
         }
 
         $result = $this->enrichExportRows($result, $offset);
+        $result = $this->enrichPoCount($result);
 
         $this->addOrderImageToRows($result);
         $this->addUsernameToRows($result);
@@ -480,6 +484,7 @@ class ShipplanController extends Controller
             'buyer'   => 'nullable|string',
             'POno'    => 'nullable|string',
             'OP'      => 'nullable|string',
+            'poref'   => 'nullable|string',
             'factory' => 'nullable|string',
             'popks'   => 'nullable|string',
             'GAC'     => 'nullable|date',
@@ -530,6 +535,7 @@ class ShipplanController extends Controller
                     'exportpk' => $exportpk,
                     'POno'     => $row['POno'],
                     'OP'       => $row['OP'],
+                    'poref'    => $row['poref'],
                     'qty'      => $row['qty'],
                     'mif'      => $row['mif'],
                     'invs'     => null,
@@ -577,6 +583,55 @@ class ShipplanController extends Controller
                 ->whereIn('poexportpk', $poexportpk->all())
                 ->update([
                     'invs' => $validated['invs'] ?: null,
+                ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Invoice berhasil disimpan.',
+                'updated' => $updated,
+                'poexportpk' => $poexportpk->values()->all(),
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            dd($e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan invoice.',
+            ], 500);
+        }
+    }
+
+    public function set_peb(Request $request)
+    {
+        $validated = $request->validate([
+            'poexportpk' => 'required|string',
+            'pebno'       => 'nullable|string',
+        ]);
+
+        $poexportpk = collect(explode(',', $validated['poexportpk']))
+            ->map(fn($v) => trim($v))
+            ->filter(fn($v) => $v !== '')
+            ->unique()
+            ->values();
+
+        if ($poexportpk->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada list yang dipilih.',
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $updated = DB::table('poexport')
+                ->whereIn('poexportpk', $poexportpk->all())
+                ->update([
+                    'pebno' => $validated['pebno'] ?: null,
                 ]);
 
             DB::commit();
@@ -1829,10 +1884,12 @@ class ShipplanController extends Controller
                 'export.ordpk',
                 'poexport.POno',
                 'poexport.OP',
+                'poexport.poref',
                 'poexport.poexportpk',
+                'poexport.pebno',
                 'poexport.invs',
                 'export.buyer',
-                'export.pebno',
+                // 'export.pebno',
                 'export.nobook',
                 'export.stscancel',
                 'export.lockship',
@@ -1908,7 +1965,8 @@ class ShipplanController extends Controller
                     ->orWhere('export.buyer', 'like', "%{$search}%")
                     ->orWhere('export.pebno', 'like', "%{$search}%")
                     ->orWhere('export.nobook', 'like', "%{$search}%")
-                    ->orWhere('poexport.invs', 'like', "%{$search}%");
+                    ->orWhere('poexport.invs', 'like', "%{$search}%")
+                    ->orWhere('poexport.pebno', 'like', "%{$search}%");
             });
         }
 
@@ -2539,5 +2597,396 @@ class ShipplanController extends Controller
         $writer->save($tempPath);
 
         return response()->download($tempPath, $filename)->deleteFileAfterSend(true);
+    }
+
+    //SET INVOICE BARU
+    // Daftar nomor invoice yang sudah ada (distinct) + jumlah PO yang memakainya
+    public function invoiceOptions(Request $request)
+    {
+        $q = $request->get('q');
+
+        $list = DB::table('poexport')
+            ->whereNotNull('invs')
+            ->where('invs', '<>', '')
+            ->when($q, function ($query) use ($q) {
+                $query->where('invs', 'like', "%{$q}%");
+            })
+            ->select('invs', DB::raw('COUNT(*) as total_po'))
+            ->groupBy('invs')
+            ->orderByRaw("CAST(SUBSTRING_INDEX(invs, '/', -1) AS UNSIGNED) DESC") // tahun
+            ->orderByRaw("CAST(SUBSTRING_INDEX(invs, '/', 1) AS UNSIGNED) DESC")  // nomor urut
+            ->limit(200)
+            ->get();
+
+        return response()->json($list);
+    }
+
+    // Generate nomor berikutnya dari nomor terakhir tahun berjalan
+    public function generateInvoiceNumber()
+    {
+        $year = now()->year;
+
+        $lastInvs = DB::table('poexport')
+            ->where('invs', 'like', "%/INV/{$year}")
+            ->orderByRaw("CAST(SUBSTRING_INDEX(invs, '/', 1) AS UNSIGNED) DESC")
+            ->value('invs');
+
+        if ($lastInvs) {
+            $prefix = explode('/', $lastInvs)[0];
+            $next = ((int) $prefix) + 1;
+            $width = max(3, strlen($prefix)); // ikuti lebar nomor terakhir (min 3 digit)
+        } else {
+            $next = 1;
+            $width = 3;
+        }
+
+        return response()->json([
+            'invs' => str_pad($next, $width, '0', STR_PAD_LEFT) . '/INV/' . $year,
+            'last' => $lastInvs,
+        ]);
+    }
+
+    public function deletePo(Request $request)
+    {
+        $po = DB::table('poexport')
+            ->where('poexportpk', $request->input('poexportpk'))
+            ->first();
+
+        if (!$po) {
+            return response()->json(['success' => false, 'message' => 'Data PO tidak ditemukan.'], 404);
+        }
+
+        $exportpk = $po->exportpk;
+
+        // export dengan 1 PO tidak boleh dihapus lewat sini
+        $totalPo = DB::table('poexport')->where('exportpk', $exportpk)->count();
+        if ($totalPo <= 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Shipment plan ini hanya punya 1 PO, tidak bisa dihapus dari sini.'
+            ], 422);
+        }
+
+        $andon = DB::connection('mysql_andon');
+
+        // query dasar: carton milik PO ini di export ini (POno + OP + poref via tabel po)
+        $poCartons = function () use ($andon, $exportpk, $po) {
+            return $andon->table('pack')
+                ->where('exportpk', $exportpk)
+                ->where('POno', $po->POno)
+                ->where('OP', $po->OP)
+                ->whereIn('popk', function ($q) use ($po) {
+                    $q->select('popk')
+                        ->from('po')
+                        ->where('poref', $po->poref);
+                });
+        };
+
+        // ATURAN BARU: kalau masih ada carton PO ini yang di-load di container, tidak boleh hapus
+        $loaded = $poCartons()->whereNotNull('contpk')->count();
+        if ($loaded > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Carton PO {$po->POno} sudah di-load di container ({$loaded} carton). "
+                    . 'Unload dulu carton PO ini dari container, baru PO bisa dihapus.'
+            ], 422);
+        }
+
+        $newPOno = '';
+        $newOP = '';
+        $unassigned = 0;
+
+        DB::beginTransaction();
+        $andon->beginTransaction();
+
+        try {
+            // carton yang tersisa (belum masuk container): lepas dari export
+            $unassigned = $poCartons()->update([
+                'exportpk' => null,
+                'contpk' => null,
+            ]);
+
+            DB::table('poexport')->where('poexportpk', $po->poexportpk)->delete();
+
+            // susun ulang POno & OP di export dari poexport yang tersisa
+            $remaining = DB::table('poexport')
+                ->where('exportpk', $exportpk)
+                ->orderBy('poexportpk')
+                ->get(['POno', 'OP']);
+
+            $export = DB::table('export')->where('exportpk', $exportpk)->lockForUpdate()->first();
+
+            $sep = (strpos((string) ($export->POno ?? ''), ', ') !== false
+                || strpos((string) ($export->OP ?? ''), ', ') !== false) ? ', ' : ',';
+
+            $newPOno = implode($sep, $remaining->pluck('POno')->filter()->unique()->all());
+            $newOP = implode($sep, $remaining->pluck('OP')->filter()->unique()->all());
+
+            DB::table('export')->where('exportpk', $exportpk)->update([
+                'POno' => $newPOno,
+                'OP' => $newOP,
+            ]);
+
+            DB::commit();
+            $andon->commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $andon->rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus PO: ' . $e->getMessage()
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "PO {$po->POno} berhasil dihapus dari shipment plan."
+                . ($unassigned > 0 ? " {$unassigned} carton dilepas dari shipment plan." : ''),
+            'unassigned' => $unassigned,
+            'POno' => $newPOno,
+            'OP' => $newOP,
+        ]);
+    }
+
+    private function enrichPoCount($result)
+    {
+        $exportpkList = $result->pluck('exportpk')->filter()->unique()->values();
+
+        $poCounts = DB::table('poexport')
+            ->whereIn('exportpk', $exportpkList)
+            ->select('exportpk', DB::raw('COUNT(*) as c'))
+            ->groupBy('exportpk')
+            ->pluck('c', 'exportpk');
+
+        return $result->map(function ($row) use ($poCounts) {
+            $row->po_count = (int) ($poCounts[$row->exportpk] ?? 1);
+            return $row;
+        });
+    }
+
+    public function availablePo(Request $request, $exportpk)
+    {
+        $andon  = DB::connection('mysql_andon');
+        $search = trim((string) $request->input('q', ''));
+
+        $export = DB::table('export')->where('exportpk', $exportpk)->first(['exportpk', 'buyer']);
+        if (!$export) {
+            return response()->json(['success' => false, 'message' => 'Shipment plan tidak ditemukan.'], 404);
+        }
+        $buyer = trim((string) $export->buyer);
+        if ($buyer === '') {
+            return response()->json(['success' => false, 'message' => 'Buyer shipment plan ini belum terisi.'], 422);
+        }
+
+        $existing = [];
+        foreach (DB::table('poexport')->where('exportpk', $exportpk)->get(['POno', 'OP']) as $r) {
+            $existing[$r->POno . '|' . $r->OP] = true;
+        }
+
+        // A) PO yang sudah punya carton bebas di pack
+        $qa = $andon->table('pack as p')
+            ->join('po', 'po.popk', '=', 'p.popk')
+            ->whereNull('p.exportpk')
+            ->where('po.' . self::PACK_BUYER_COL, $buyer)
+            ->groupBy('p.POno', 'p.OP', 'po.poref')
+            ->selectRaw('p.POno, p.OP, po.poref, COUNT(*) as ctn, SUM(p.pcsp) as qty')
+            ->orderBy('p.OP', 'DESC')
+            ->limit(300);
+
+        // B) PO yang belum ada packnya sama sekali -> langsung dari tabel po
+        $qb = $andon->table('po')
+            ->where('po.' . self::PO_BUYER_COL, $buyer)
+            ->whereNotExists(function ($q) {
+                $q->select(DB::raw(1))->from('pack')->whereRaw('pack.popk = po.popk');
+            })
+            ->groupBy('po.POno', 'po.OP', 'po.poref')
+            ->selectRaw('po.POno, po.OP, po.poref, 0 as ctn, 0 as qty')
+            ->orderBy('po.OP', 'DESC')
+            ->limit(300);
+
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+
+            $qa->where(function ($q) use ($like) {
+                $q->where('p.POno', 'like', $like)
+                    ->orWhere('p.OP', 'like', $like);
+            });
+
+            $qb->where(function ($q) use ($like) {
+                $q->where('po.POno', 'like', $like)
+                    ->orWhere('po.OP', 'like', $like);
+            });
+        }
+
+        $rows = [];
+        $seen = [];
+        foreach ([$qa->get(), $qb->get()] as $set) {      // A dulu, B hanya yang belum muncul di A
+            foreach ($set as $r) {
+                $key = $r->POno . '|' . $r->OP;
+                if (isset($existing[$key]) || isset($seen[$key])) continue;
+                $seen[$key] = true;
+                $rows[] = $r;
+            }
+        }
+
+        return response()->json(['success' => true, 'buyer' => $buyer, 'data' => $rows]);
+    }
+
+    /**
+     * POST /export/po-add
+     * body: exportpk, items[] = {POno, OP, poref}
+     */
+    public function addPo(Request $request)
+    {
+        $this->validate($request, [
+            'exportpk'      => 'required|integer',
+            'items'         => 'required|array|min:1',
+            'items.*.POno'  => 'required|string',
+            'items.*.OP'    => 'nullable|string',
+            'items.*.poref' => 'required|string',
+        ]);
+
+        $exportpk = (int) $request->input('exportpk');
+        $items    = $request->input('items');
+        $andon    = DB::connection('mysql_andon');
+
+        $export = DB::table('export')->where('exportpk', $exportpk)->first();
+        if (!$export) {
+            return response()->json(['success' => false, 'message' => 'Shipment plan tidak ditemukan.'], 404);
+        }
+        if (!empty($export->stscancel) || !empty($export->lockship)) {
+            return response()->json(['success' => false, 'message' => 'Shipment plan sudah di-lock / dibatalkan, PO tidak bisa ditambahkan.'], 422);
+        }
+
+        DB::beginTransaction();
+        $andon->beginTransaction();
+
+        try {
+            DB::table('export')->where('exportpk', $exportpk)->lockForUpdate()->first();
+
+            $addedPo = [];
+            $totCtn  = 0;
+            $totQty  = 0;
+            $skipped = [];
+
+            $buyer = trim((string) $export->buyer);
+            if ($buyer === '') {
+                DB::rollBack();
+                $andon->rollBack();
+                return response()->json(['success' => false, 'message' => 'Buyer shipment plan ini belum terisi.'], 422);
+            }
+
+            foreach ($items as $it) {
+                $pono  = trim($it['POno']);
+                $op    = isset($it['OP']) ? trim($it['OP']) : '';
+                $poref = trim($it['poref']);
+
+                $dupe = DB::table('poexport')
+                    ->where('exportpk', $exportpk)->where('POno', $pono)->where('OP', $op)
+                    ->exists();
+                if ($dupe) {
+                    $skipped[] = $pono . ' (sudah ada di shipment plan ini)';
+                    continue;
+                }
+
+                $cartons = function () use ($andon, $pono, $op, $poref, $buyer) {
+                    return $andon->table('pack')
+                        ->whereNull('exportpk')
+                        ->where('POno', $pono)
+                        ->where('OP', $op)
+                        ->whereIn('popk', function ($q) use ($poref, $buyer) {
+                            $q->select('popk')->from('po')
+                                ->where('poref', $poref)
+                                ->where(self::PO_BUYER_COL, $buyer);   // buyer dari tabel po
+                        });
+                };
+
+                $ctn = $cartons()->count();
+                $qty = 0;
+
+                if ($ctn > 0) {
+                    $qty = (int) $cartons()->sum('pcsp');
+                    $cartons()->update(['exportpk' => $exportpk]);   // assign carton ke shipment plan
+                } else {
+                    // belum ada carton bebas: valid hanya kalau PO ada di tabel po (buyer sama)
+                    // dan memang belum punya pack sama sekali
+                    $poOk = $andon->table('po')
+                        ->where('poref', $poref)->where('POno', $pono)->where('OP', $op)
+                        ->where('po.' . self::PO_BUYER_COL, $buyer)
+                        ->exists();
+
+                    $hasAnyPack = $andon->table('pack')
+                        ->where('POno', $pono)->where('OP', $op)
+                        ->whereIn('popk', function ($q) use ($poref) {
+                            $q->select('popk')->from('po')->where('poref', $poref);
+                        })
+                        ->exists();
+
+                    if (!$poOk) {
+                        $skipped[] = $pono . ' (PO tidak ditemukan / beda buyer)';
+                        continue;
+                    }
+                    if ($hasAnyPack) {
+                        $skipped[] = $pono . ' (carton sudah dipakai shipment plan lain)';
+                        continue;
+                    }
+                }
+
+                DB::table('poexport')->insert([
+                    'exportpk' => $exportpk,
+                    'POno'     => $pono,
+                    'OP'       => $op,
+                    'poref'    => $poref,
+                    'qty'      => $qty,
+                ]);
+
+                $addedPo[] = $pono;
+                $totCtn   += $ctn;
+                $totQty   += $qty;
+            }
+
+            if (empty($addedPo)) {
+                DB::rollBack();
+                $andon->rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada PO yang ditambahkan. ' . implode('; ', $skipped),
+                ], 422);
+            }
+
+            // 3) rebuild export.POno / export.OP dari poexport
+            $sep = (strpos((string) $export->POno, ', ') !== false) ? ', ' : ',';
+
+            $rows  = DB::table('poexport')->where('exportpk', $exportpk)->orderBy('poexportpk')->get(['POno', 'OP']);
+            $ponos = [];
+            $ops   = [];
+            foreach ($rows as $r) {
+                if ($r->POno !== null && $r->POno !== '') $ponos[] = $r->POno;
+                if ($r->OP   !== null && $r->OP   !== '') $ops[]   = $r->OP;
+            }
+
+            DB::table('export')->where('exportpk', $exportpk)->update([
+                'POno'     => implode($sep, array_values(array_unique($ponos))),
+                'OP'       => implode($sep, array_values(array_unique($ops))),
+                'totctn'   => DB::raw('COALESCE(totctn,0) + ' . (int) $totCtn),
+                'qty_list' => DB::raw('COALESCE(qty_list,0) + ' . (int) $totQty),
+            ]);
+
+            DB::commit();
+            $andon->commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => count($addedPo) . ' PO ditambahkan (' . implode(', ', $addedPo) . ').'
+                    . (empty($skipped) ? '' : ' Dilewati: ' . implode('; ', $skipped)),
+                'added'   => $addedPo,
+                'skipped' => $skipped,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $andon->rollBack();
+            return response()->json(['success' => false, 'message' => 'Gagal menambah PO: ' . $e->getMessage()], 500);
+        }
     }
 }

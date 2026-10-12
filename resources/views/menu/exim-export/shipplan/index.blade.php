@@ -57,6 +57,7 @@
             color: #101828;
             margin: 2px 0 0;
         }
+
         .sp-idship-stack {
             display: flex;
             flex-direction: column;
@@ -78,6 +79,7 @@
             font-weight: 500;
             text-transform: uppercase;
         }
+
         .sp-idship-pic i {
             font-size: 10px;
         }
@@ -362,12 +364,12 @@
         }
 
         /* .sp-refresh-btn:hover {
-            background: #F9FAFB;
-        }
+                                        background: #F9FAFB;
+                                    }
 
-        .sp-refresh-btn:active i {
-            transform: rotate(180deg);
-        } */
+                                    .sp-refresh-btn:active i {
+                                        transform: rotate(180deg);
+                                    } */
 
         .sp-refresh-btn i {
             transition: transform .3s ease;
@@ -377,7 +379,8 @@
             width: 30px;
             height: 30px;
             object-fit: contain;
-            pointer-events: none; /* biar area klik tetap seluruh tombol, bukan cuma gambarnya */
+            pointer-events: none;
+            /* biar area klik tetap seluruh tombol, bukan cuma gambarnya */
         }
 
         .sp-refresh-btn:hover {
@@ -465,7 +468,7 @@
         }
 
         /* selector pakai ID supaya menang atas `.header` (position:absolute; top:58px)
-           yang dideklarasikan ulang di bawah blok .sticky ini */
+                                       yang dideklarasikan ulang di bawah blok .sticky ini */
         #myHeader2.sticky {
             position: fixed;
             top: 0;
@@ -850,9 +853,9 @@
         }
 
         /* ============================================================
-                                                                                                                                                                               SAMA dengan TF Finishing/Polibag -- cell gabungan Order Info
-                                                                                                                                                                               & PO No.
-                                                                                                                                                                               ============================================================ */
+                                                                                                                                                                                                           SAMA dengan TF Finishing/Polibag -- cell gabungan Order Info
+                                                                                                                                                                                                           & PO No.
+                                                                                                                                                                                                           ============================================================ */
         #dgOrder .datagrid-header .datagrid-cell {
             font-weight: 600;
             color: #374151;
@@ -1700,7 +1703,7 @@
         }
 
         /* ============ BAGIAN BARU: MULTI CONTAINER ============ */
-         /* ============ BAGIAN BARU: MULTI CONTAINER ============ */
+        /* ============ BAGIAN BARU: MULTI CONTAINER ============ */
         .mc-pane-toolbar {
             display: flex;
             align-items: center;
@@ -1773,8 +1776,8 @@
         }
 
         .container-foto-vessel::before {
-             content: "No. Container: ";
-             color: #98A2B3;
+            content: "No. Container: ";
+            color: #98A2B3;
         }
 
 
@@ -1973,6 +1976,134 @@
             cursor: not-allowed;
             pointer-events: none;
         }
+
+        /*css modal conformasi delete po*/
+        .dpo-content {
+            border: 0;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(16, 24, 40, .25);
+        }
+
+        .dpo-body {
+            padding: 28px 28px 8px;
+            text-align: center;
+        }
+
+        .dpo-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #FEE4E2;
+            color: #D92D20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 14px;
+        }
+
+        .dpo-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #101828;
+            margin: 0 0 10px;
+        }
+
+        .dpo-po {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 999px;
+            background: #F2F4F7;
+            color: #344054;
+            font-size: .85rem;
+            margin-bottom: 16px;
+        }
+
+        .dpo-list {
+            list-style: none;
+            margin: 0 0 8px;
+            padding: 12px 14px;
+            text-align: left;
+            background: #F9FAFB;
+            border: 1px solid #EAECF0;
+            border-radius: 10px;
+        }
+
+        .dpo-list li {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            font-size: .85rem;
+            color: #475467;
+            padding: 5px 0;
+        }
+
+        .dpo-list li i {
+            color: #D92D20;
+            margin-top: 2px;
+        }
+
+        .dpo-error {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: .85rem;
+            background: #FEF3F2;
+            color: #B42318;
+            border: 1px solid #FECDCA;
+            text-align: left;
+        }
+
+        .dpo-footer {
+            display: flex;
+            gap: 10px;
+            padding: 16px 28px 24px;
+        }
+
+        .dpo-btn {
+            flex: 1;
+            height: 42px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: .9rem;
+            border: 1px solid transparent;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: background .15s, box-shadow .15s;
+        }
+
+        .dpo-btn-ghost {
+            background: #fff;
+            color: #344054;
+            border-color: #D0D5DD;
+        }
+
+        .dpo-btn-ghost:hover {
+            background: #F9FAFB;
+        }
+
+        .dpo-btn-danger {
+            background: #D92D20;
+            color: #fff;
+        }
+
+        .dpo-btn-danger:hover {
+            background: #B42318;
+        }
+
+        .dpo-btn:disabled {
+            opacity: .65;
+            cursor: not-allowed;
+        }
+
+        .dpo-btn:focus-visible {
+            outline: 0;
+            box-shadow: 0 0 0 4px rgba(217, 45, 32, .2);
+        }
     </style>
 @endsection
 
@@ -1998,7 +2129,7 @@
             $('[data-toggle="tooltip"]').tooltip();
         });
 
-         function myformatter(date) {
+        function myformatter(date) {
             var d = new Date(date || Date.now()),
                 month = '' + (d.getMonth() + 1),
                 day = '' + d.getDate(),
@@ -2142,7 +2273,7 @@
                 if (merges.length === 0) return;
 
                 // 2. kolom yang mau di-merge
-                var fields = ['idship', 'contdate', 'GAC', 'exdate', 'buyer', 'pebno', 'vassal', 'exdate', 'status',
+                var fields = ['exportpk', 'idship', 'contdate', 'GAC', 'exdate', 'buyer', 'vassal', 'exdate', 'status',
                     'action', 'type'
                 ];
 
@@ -2169,12 +2300,12 @@
                 for (var i = 1; i <= rows.length; i++) {
                     if (
                         i === rows.length ||
+                        norm(rows[i].exportpk) !== norm(rows[start].exportpk) ||
                         norm(rows[i].idship) !== norm(rows[start].idship) ||
                         norm(rows[i].contdate) !== norm(rows[start].contdate) ||
                         norm(rows[i].GAC) !== norm(rows[start].GAC) ||
                         norm(rows[i].exdate) !== norm(rows[start].exdate) ||
                         norm(rows[i].buyer) !== norm(rows[start].buyer) ||
-                        norm(rows[i].pebno) !== norm(rows[start].pebno) ||
                         norm(rows[i].vassal) !== norm(rows[start].vassal) ||
                         norm(rows[i].exdate) !== norm(rows[start].exdate) ||
                         norm(rows[i].status) !== norm(rows[start].status) ||
@@ -2241,6 +2372,34 @@
                                 checkbox: 'true'
                             },
                             {
+                                field: 'po_count',
+                                title: '',
+                                width: 50,
+                                formatter: function(v, row) {
+                                    if (v > 1 && row.stscancel < 1) {
+                                        return `<a href="javascript:void(0)" class="text-danger"
+                                                data-bs-toggle="tooltip"
+                                                title="Delete PO number"
+                                                onclick="delete_po(${row.poexportpk}, '${(row.POno || '').replace(/'/g, "\\'")}')">
+                                                <i class="bi bi-trash"></i></a>`;
+                                    }
+                                }
+                            },
+                            // {
+                            //     field: 'exportpk',
+                            //     title: '',
+                            //     width: 50,
+                            //     formatter: function(v, row) {
+                            //         if (row.stscancel < 1) {
+                            //              return `<a href="javascript:void(0)" class="text-success"
+                            //                 data-bs-toggle="tooltip"
+                            //                 title="Add PO number"
+                            //                 onclick="add_po(${row.exportpk}, '${(row.buyer || '').replace(/'/g, "\\'")}')">
+                            //                 <i class="bi bi-plus-square"></i></a>`;
+                            //         }
+                            //     }
+                            // },
+                            {
                                 field: 'ordno',
                                 title: 'OP/Style',
                                 width: 250,
@@ -2252,7 +2411,7 @@
                                 title: 'ID Shipplan<br>/PIC',
                                 align: 'center',
                                 width: 130,
-                                formatter: function (v, row) {
+                                formatter: function(v, row) {
                                     const idShip = v ? escapeHtml(v) : '-';
                                     const pic = row.login ? escapeHtml(row.login) : '-';
                                     const guserpk = {{ (int) Session::get('guserpk', 0) }};
@@ -2263,8 +2422,8 @@
                                             ${
                                                 guserpk === 7
                                                     ? `<span class="sp-idship-pic">
-                                                            <i class="bi bi-person-fill"></i> ${pic}
-                                                    </span>`
+                                                                                        <i class="bi bi-person-fill"></i> ${pic}
+                                                                                </span>`
                                                     : ''
                                             }
                                         </div>
@@ -2412,7 +2571,7 @@
                                 align: 'center',
                                 formatter: function(val, row) {
                                     return `
-                                    <button type="button" class="sp-action-btn pe-4" onclick="event.stopPropagation(); toggleActionMenu(event, ${row.exportpk}, ${row.stsexp}, ${row.lockship}, '${row.endship}', ${row.stscancel}, ${row.stsstart})">
+                                    <button type="button" class="sp-action-btn pe-4" onclick="event.stopPropagation(); toggleActionMenu(event, ${row.exportpk}, ${row.stsexp}, ${row.lockship}, '${row.endship}', ${row.stscancel}, ${row.stsstart}, '${row.buyer}')">
                                         <i class="bi bi-three-dots-vertical"></i>
                                     </button>
                                 `;
@@ -2478,7 +2637,8 @@
                         <div class="cs-main">${row.OP ?? '-'}</div>
                         <div class="cs-sub">${row.buyer ?? '-'}</div>
                         <div class="cs-sub">PO/Style : ${row.POno ? row.POno : row.style}</div>
-                        <div class="cs-sub"><b>${row.invs ? 'INV : '+row.invs : '-'}</b></div>
+                        <div class="cs-sub">POref : ${row.poref ?? '-'}</div>
+                        <div class="cs-sub"><b>${row.invs ? 'INV : '+row.invs : 'INV : -'}</b></div>
                     </div>
                 </div>
             `;
@@ -2499,11 +2659,13 @@
                 const isForty = /40/.test(String(sizeLabel));
                 const w = isForty ? 26 : 15; // 40FT digambar ~2x lebar 20FT
                 const ridgeCount = Math.max(1, Math.floor(w / 5));
-                const ridges = Array.from({ length: ridgeCount }, (_, i) => {
+                const ridges = Array.from({
+                    length: ridgeCount
+                }, (_, i) => {
                     const x = ((i + 1) * w) / (ridgeCount + 1);
                     return `<line x1="${x.toFixed(1)}" y1="1.5" x2="${x.toFixed(1)}" y2="11.5" stroke="currentColor" stroke-width="0.6" stroke-opacity="0.45"/>`;
                 }).join('');
-            
+
                 return `
                     <svg width="${w}" height="13" viewBox="0 0 ${w} 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;display:block;">
                         <rect x="0.5" y="0.5" width="${w - 1}" height="12" rx="1.5"
@@ -2513,29 +2675,29 @@
                     </svg>
                 `;
             }
-            
+
             function formatContainerTypeCell(v) {
                 if (v === null || v === undefined || v === '') return '-';
-            
+
                 // Normalisasi: v bisa array, atau string digabung koma/titik-koma
-                const rawList = Array.isArray(v)
-                    ? v
-                    : String(v).split(/[,;]+/).map(s => s.trim()).filter(Boolean);
-            
+                const rawList = Array.isArray(v) ?
+                    v :
+                    String(v).split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+
                 if (!rawList.length) return '-';
-            
+
                 // Hitung jumlah tiap tipe container, urutan kemunculan pertama dipertahankan
                 const counts = new Map();
                 rawList.forEach(type => {
                     counts.set(type, (counts.get(type) || 0) + 1);
                 });
-            
+
                 const chips = Array.from(counts.entries()).map(([type, count]) => {
                     const label = escapeHtml(type);
-                    const countBadge = count > 1
-                        ? `<span style="opacity:.6;font-weight:600;margin-left:2px;">x${count}</span>`
-                        : '';
-            
+                    const countBadge = count > 1 ?
+                        `<span style="opacity:.6;font-weight:600;margin-left:2px;">x${count}</span>` :
+                        '';
+
                     return `
                         <span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:5px;background:rgba(0,0,0,.045);margin:1px 3px 1px 0;font-size:.78rem;line-height:1.6;"
                             title="${label}${count > 1 ? ` (${count} unit)` : ''}">
@@ -2544,7 +2706,7 @@
                         </span>
                     `;
                 }).join('');
-            
+
                 return `<span class="sp-cell-mono" style="display:inline-flex;flex-wrap:wrap;align-items:center;">${chips}</span>`;
             }
 
@@ -2633,9 +2795,10 @@
 
             //Untuk menu drodown tabel
             let activeActionRow = null;
+            let activeActionBuyer = null;
             let activeActionBtn = null;
 
-            window.toggleActionMenu = function(event, exportpk, stsexp, lockship, endship, stscancel, stsstart) {
+            window.toggleActionMenu = function(event, exportpk, stsexp, lockship, endship, stscancel, stsstart, buyer) {
                 const btn = event.currentTarget;
                 const menu = document.getElementById('spActionMenu');
 
@@ -2676,9 +2839,9 @@
                         $('#unlocked').addClass('d-none');
                     }
                 } else {
-                    if(stsstart == 1){
+                    if (stsstart == 1) {
                         $('#complete_shipment').removeClass('d-none');
-                    }else{
+                    } else {
                         $('#complete_shipment').addClass('d-none');
                     }
 
@@ -2696,6 +2859,7 @@
                 }
 
                 activeActionRow = exportpk;
+                activeActionBuyer = buyer;
                 activeActionBtn = btn;
 
                 // hitung posisi tombol, tampilkan menu tepat di bawahnya (rata kanan)
@@ -2724,10 +2888,14 @@
                 if (activeActionBtn) activeActionBtn.classList.remove('active');
                 activeActionBtn = null;
                 activeActionRow = null;
+                activeActionBuyer = null;
             }
 
             window.onActionClick = function(action) {
+
                 const exportpk = activeActionRow;
+                const buyer = activeActionBuyer;
+
                 closeActionMenu();
 
                 if (!exportpk) return;
@@ -2741,6 +2909,9 @@
                         break;
                     case 'export_si':
                         window.open(`{{ url('/export') }}/si/${exportpk}`, '_blank');
+                        break;
+                    case 'add_pono':
+                        add_po(exportpk, buyer);
                         break;
                     case 'remove':
                         removeListShipplan(exportpk);
@@ -2784,6 +2955,8 @@
 
             $('#PackingPlanModal').on('shown.bs.modal', function() {
                 $('#dgOrder').datagrid('resize');
+                $('#dgOrder').datagrid('clearSelections');
+                $('#dgOrder').datagrid('clearChecked');
             });
         }
 
@@ -3180,6 +3353,7 @@
             const selected = rows.map(row => ({
                 POno: row.POno,
                 OP: row.OP,
+                poref: row.poref,
                 qty: row.qty,
                 mif: row.mif,
                 GAC: row.GAC,
@@ -3621,6 +3795,7 @@
                 $('#myHeader2').addClass('d-none');
                 $('#count2').addClass('d-none');
                 $('#set_inv').hide();
+                $('#set_peb').hide();
 
                 $('#dgShipmentPlan').datagrid('clearSelections');
 
@@ -3641,8 +3816,10 @@
 
             if (bedaExportpk) {
                 $('#set_inv').hide();
+                $('#set_peb').hide();
             } else {
                 $('#set_inv').show();
+                $('#set_peb').show();
             }
 
             count_row2();
@@ -3701,6 +3878,7 @@
             // localStorage.setItem('scroll', JSON.stringify(scroll));
         }
 
+        //SET_INVOICE LAMA
         let pendingDataPO = null;
 
         function set_inv() {
@@ -3798,8 +3976,103 @@
             });
         });
 
+        function set_peb() {
+            var dg = $('#dgShipmentPlan');
+
+            if (!dg.length || !$.data(dg[0], 'datagrid')) {
+                $.messager.alert('Error', 'DataGrid belum siap.', 'error');
+                return;
+            }
+
+            var rows = dg.datagrid('getChecked');
+
+            if (!rows || rows.length === 0) {
+                $.messager.alert('Warning', 'Silakan pilih data terlebih dahulu.', 'warning');
+                return;
+            }
+
+            var poexportpk = rows.map(r => r.poexportpk).join(',');
+
+            pendingDataPO = {
+                poexportpk: poexportpk,
+            };
+
+            document.querySelectorAll('.modal.show').forEach(function(openModal) {
+                const instance = bootstrap.Modal.getInstance(openModal);
+                if (instance) instance.hide();
+            });
+            // beri jeda sedikit supaya modal lama selesai animasi tertutup dulu
+            setTimeout(function() {
+                document.getElementById('ssListCount').textContent = rows.length;
+
+                new bootstrap.Modal(document.getElementById('modalPEB')).show();
+            }, 300);
+        }
+
+        document.getElementById('btnSubmitPEB').addEventListener('click', function() {
+            const pebno = document.getElementById('ssPEB').value;
+
+            if (!pebno) {
+                showToast('Silahkan isi nomor invoice terlebih dahulu.', 'error');
+                return;
+            }
+
+            if (!pendingDataPO) {
+                showToast('Data order tidak ditemukan, silakan pilih ulang.', 'error');
+                return;
+            }
+
+            const btn = this;
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
+
+            $.ajax({
+                url: "{{ route('set_peb') }}",
+                type: "POST",
+                data: {
+                    _token: "{{ csrf_token() }}",
+                    ...pendingDataPO,
+                    pebno: pebno,
+                },
+                success: function(res) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+
+                    if (res.success) {
+
+                        // 1. Close modal
+                        const modalElement = document.getElementById('modalPEB');
+                        const modal = bootstrap.Modal.getInstance(modalElement);
+
+                        if (modal) {
+                            modal.hide();
+                        }
+                        $('#ssPEB').value = '';
+                        $('#dgShipmentPlan').datagrid('reload');
+                        showToast(
+                            res.message ?? 'Nomor PEB berhasil dibuat.',
+                            'success'
+                        );
+                        close_menu();
+
+                    } else {
+                        showToast(
+                            res.message ?? 'Gagal membuat nomor PEB.',
+                            'error'
+                        );
+                    }
+                },
+                error: function(xhr) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                    showToast(xhr.responseJSON?.message ?? 'Gagal membuat nomor PEB.', 'error');
+                }
+            });
+        });
+
         //Open modal edit shipment plan
-          (function() {
+        (function() {
             /* ================= TAB NAVIGATION ================= */
             const order = ['shipplan', 'capacity', 'info', 'schedule'];
             let current = 0;
@@ -4114,12 +4387,14 @@
                     const el = clone.querySelector('.container-item');
 
                     el.dataset.index = i;
-                    el.dataset.uid = sourceItem.dataset.uid; // penting: uid dipakai untuk mapping ke containerFotoFiles
+                    el.dataset.uid = sourceItem.dataset
+                        .uid; // penting: uid dipakai untuk mapping ke containerFotoFiles
 
                     const nosealInput = el.querySelector('[data-field="noseal"]');
                     if (nosealInput) {
                         nosealInput.name = `containers[${i}][noseal]`;
-                        nosealInput.value = existingNoseal[sourceItem.dataset.uid] || sourceItem.dataset.noseal || '';
+                        nosealInput.value = existingNoseal[sourceItem.dataset.uid] || sourceItem.dataset
+                            .noseal || '';
                     }
 
                     el.querySelector('.container-foto-num').textContent = i + 1;
@@ -4397,7 +4672,8 @@
                     [containerFotoFiles, containerFotoUrls].forEach(m => {
                         [...m.keys()].forEach(k => k.startsWith(prefix) && m.delete(k));
                     });
-                    [...containerFotoRemoved].forEach(k => k.startsWith(prefix) && containerFotoRemoved.delete(k));
+                    [...containerFotoRemoved].forEach(k => k.startsWith(prefix) && containerFotoRemoved.delete(
+                        k));
 
                     el.remove();
                     renumber();
@@ -4414,7 +4690,7 @@
                 goTo(targetTabIndex >= 0 ? targetTabIndex : 0);
 
                 setModalLockMode(!!window.__pendingLockMode);
-               
+
                 window.__pendingTargetTab = null;
                 window.__pendingLockMode = null;
 
@@ -4471,7 +4747,7 @@
                 onExdateChange();
             });
 
-            document.getElementById('modalCreateContainer').addEventListener('hidden.bs.modal', function () {
+            document.getElementById('modalCreateContainer').addEventListener('hidden.bs.modal', function() {
                 currentMode = 'create';
                 currentExportpk = null;
                 containerList.innerHTML = '';
@@ -4524,9 +4800,10 @@
                         stage = 'header';
                         document.getElementById('exportpk').value = exportpk;
 
-                         $('#ordnop').text(data.OP ? 'ORDER NUMBER : ' + data.OP : 'No Order Number');
+                        $('#ordnop').text(data.OP ? 'ORDER NUMBER : ' + data.OP : 'No Order Number');
                         $('#buyerp').text(data.buyer ? 'BUYER : ' + data.buyer : 'No Buyer Information');
-                        $('#POnop').text(data.POno ? 'PO : ' + String(data.POno).split(',').map(s => s.trim()).filter(Boolean).join(', ') : 'No PO Number');
+                        $('#POnop').text(data.POno ? 'PO : ' + String(data.POno).split(',').map(s => s.trim())
+                            .filter(Boolean).join(', ') : 'No PO Number');
 
                         // // isi field header
                         const pebno = form.querySelector('[name="pebno"]');
@@ -4654,7 +4931,7 @@
                             // simpan URL foto lama (kalau ada) ke Map DULUAN, dipakai syncContainerFotoTab().
                             // harus sebelum addContainerCard(), karena addContainerCard() -> renumber()
                             // sudah memanggil syncContainerFotoTab() dan membaca Map ini.
-                            
+
                             data.containers.forEach(c => addContainerCard(c));
                         } else {
                             addContainerCard(); // fallback: minimal 1 card kosong
@@ -4977,6 +5254,354 @@
             }
         })();
 
+        //SET INOVICE BARU
+        (function() {
+            const modalEl = document.getElementById('modalInvoice');
+            const finalInput = document.getElementById('ssInvs');
+            const selectEl = document.getElementById('ssInvsExisting');
+            const genBtn = document.getElementById('btnGenerateInvs');
+            const genHint = document.getElementById('ssInvsGenHint');
+            const panelExisting = document.getElementById('ssInvsPanelExisting');
+            const panelAuto = document.getElementById('ssInvsPanelAuto');
+
+            const urlOptions = "{{ route('invoice.options') }}";
+            const urlGenerate = "{{ route('invoice.generate') }}";
+
+            function currentMode() {
+                return modalEl.querySelector('input[name="ssInvsMode"]:checked').value;
+            }
+
+            async function loadExistingOptions() {
+                selectEl.innerHTML = '<option value="">Memuat...</option>';
+                try {
+                    const res = await fetch(urlOptions, {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const list = await res.json();
+
+                    selectEl.innerHTML = '<option value="">-- Pilih nomor invoice --</option>';
+                    list.forEach(function(item) {
+                        const opt = document.createElement('option');
+                        opt.value = item.invs;
+                        opt.textContent = item.invs + ' (' + item.total_po + ' PO)';
+                        selectEl.appendChild(opt);
+                    });
+                    if (!list.length) {
+                        selectEl.innerHTML = '<option value="">Belum ada nomor invoice</option>';
+                    }
+                } catch (e) {
+                    console.error('[invoice] gagal memuat daftar invoice:', e);
+                    selectEl.innerHTML = '<option value="">Gagal memuat daftar</option>';
+                }
+            }
+
+            async function generateNext() {
+                genBtn.disabled = true;
+                genHint.textContent = 'Menghitung nomor berikutnya...';
+                try {
+                    const res = await fetch(urlGenerate, {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const data = await res.json();
+
+                    finalInput.value = data.invs;
+                    genHint.textContent = data.last ?
+                        'Nomor terakhir: ' + data.last :
+                        'Belum ada invoice tahun ini, mulai dari 1';
+                } catch (e) {
+                    console.error('[invoice] gagal generate nomor:', e);
+                    finalInput.value = '';
+                    genHint.textContent = 'Gagal generate nomor invoice.';
+                } finally {
+                    genBtn.disabled = false;
+                }
+            }
+
+            function applyMode() {
+                const mode = currentMode();
+                panelExisting.classList.toggle('d-none', mode !== 'existing');
+                panelAuto.classList.toggle('d-none', mode !== 'auto');
+                finalInput.value = '';
+
+                if (mode === 'existing') {
+                    selectEl.value = '';
+                } else {
+                    generateNext();
+                }
+            }
+
+            modalEl.querySelectorAll('input[name="ssInvsMode"]').forEach(function(radio) {
+                radio.addEventListener('change', applyMode);
+            });
+
+            selectEl.addEventListener('change', function() {
+                finalInput.value = selectEl.value;
+            });
+
+            genBtn.addEventListener('click', generateNext);
+
+            // setiap modal dibuka: reset ke mode "pilih yang sudah ada" + muat ulang daftar
+            modalEl.addEventListener('show.bs.modal', function() {
+                modalEl.querySelector('input[name="ssInvsMode"][value="existing"]').checked = true;
+                loadExistingOptions();
+                applyMode();
+            });
+        })();
+
+        (function() {
+            const modalEl = document.getElementById('modalDeletePo');
+            const btnConfirm = document.getElementById('btnConfirmDeletePo');
+            const btnCancel = document.getElementById('btnCancelDeletePo');
+            const spinner = document.getElementById('dpoSpinner');
+            const btnText = document.getElementById('dpoBtnText');
+            const errorBox = document.getElementById('dpoError');
+
+            let pendingPk = null;
+
+            function setLoading(on) {
+                btnConfirm.disabled = on;
+                btnCancel.disabled = on;
+                spinner.classList.toggle('d-none', !on);
+                btnText.textContent = on ? 'Menghapus...' : 'Ya, Hapus';
+            }
+
+            function showError(msg) {
+                errorBox.textContent = msg;
+                errorBox.classList.remove('d-none');
+            }
+
+            // dipanggil dari tombol/menu: delete_po(row.poexportpk, row.POno)
+            window.delete_po = function(poexportpk, pono) {
+                pendingPk = poexportpk;
+                document.getElementById('dpoPoNo').textContent = pono || '-';
+                errorBox.classList.add('d-none');
+                setLoading(false);
+
+                const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                modal.show();
+            };
+
+            btnConfirm.addEventListener('click', function() {
+                if (pendingPk === null) return;
+
+                const tokenEl = document.querySelector('meta[name="csrf-token"]');
+                errorBox.classList.add('d-none');
+                setLoading(true);
+
+                fetch("{{ route('export.po-delete') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': tokenEl ? tokenEl.content : ''
+                        },
+                        body: JSON.stringify({
+                            poexportpk: pendingPk
+                        })
+                    })
+                    .then(async function(res) {
+                        const data = await res.json().catch(function() {
+                            return {};
+                        });
+                        if (!res.ok || !data.success) {
+                            throw new Error(data.message || ('HTTP ' + res.status));
+                        }
+                        return data;
+                    })
+                    .then(function(data) {
+                        bootstrap.Modal.getInstance(modalEl).hide();
+                        if (typeof showToast === 'function') showToast(data.message, 'success');
+                        reloadSpGrid();
+                    })
+                    .catch(function(err) {
+                        console.error('[delete_po]', err);
+                        showError(err.message);
+                        setLoading(false);
+                    });
+            });
+        })();
+
+        //ADD PO
+        (function() {
+            const csrf = () => document.querySelector('meta[name="csrf-token"]').content;
+            let apoExportpk = null;
+
+            function ensureModal() {
+                if (document.getElementById('modalAddPo')) return;
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal fade" id="modalAddPo" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Tambah PO ke <span id="apoIdship"></span></h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="text" id="apoSearch" class="form-control form-control-sm mb-2" placeholder="Cari POno...">
+                            <div id="apoError" class="alert alert-danger py-2 d-none"></div>
+                            <table class="table table-sm table-hover align-middle mb-0">
+                            <thead><tr>
+                                <th style="width:32px"><input type="checkbox" id="apoCheckAll"></th>
+                                <th>POno</th><th>OP</th><th>PO Ref</th><th class="text-end">Carton</th><th class="text-end">Qty</th>
+                            </tr></thead>
+                            <tbody id="apoBody"><tr><td colspan="6" class="text-center text-muted">Memuat...</td></tr></tbody>
+                            </table>
+                        </div>
+                        <div class="modal-footer">
+                            <span class="me-auto small text-muted"><span id="apoCount">0</span> PO dipilih</span>
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                            <button type="button" class="btn btn-primary" id="btnSaveAddPo">
+                            <span class="spinner-border spinner-border-sm d-none me-1" id="apoSpin"></span>Simpan
+                            </button>
+                        </div>
+                        </div>
+                    </div>
+                    </div>`);
+
+                let t;
+                document.getElementById('apoSearch').addEventListener('input', function() {
+                    clearTimeout(t);
+                    t = setTimeout(loadList, 300);
+                });
+                document.getElementById('apoCheckAll').addEventListener('change', function() {
+                    document.querySelectorAll('#apoBody .apo-chk').forEach(c => c.checked = this.checked);
+                    updateCount();
+                });
+                document.getElementById('apoBody').addEventListener('change', updateCount);
+                document.getElementById('btnSaveAddPo').addEventListener('click', save);
+            }
+
+            function updateCount() {
+                document.getElementById('apoCount').textContent =
+                    document.querySelectorAll('#apoBody .apo-chk:checked').length;
+            }
+
+            function esc(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                } [m]));
+            }
+
+            async function loadList() {
+                const body = document.getElementById('apoBody');
+                body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Memuat...</td></tr>';
+                const q = encodeURIComponent(document.getElementById('apoSearch').value.trim());
+                try {
+                    const urlTpl = '{{ route('export.available-po', ['exportpk' => '__ID__']) }}';
+                    const url = urlTpl.replace('__ID__', apoExportpk) + '?q=' + q;
+                    const res = await fetch(url, {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    const json = await res.json();
+                    const rows = json.data || [];
+                    if (!rows.length) {
+                        body.innerHTML =
+                            '<tr><td colspan="6" class="text-center text-muted">Tidak ada PO yang tersedia.</td></tr>';
+                        return;
+                    }
+                    body.innerHTML = rows.map((r, i) => `
+                    <tr>
+                    <td><input type="checkbox" class="apo-chk" data-i="${i}"></td>
+                    <td>${esc(r.POno)}</td><td>${esc(r.OP)}</td><td>${esc(r.poref)}</td>
+                    <td class="text-end">${r.ctn > 0 ? r.ctn : '<span class="badge bg-secondary">belum ada pack</span>'}</td>
+                    <td class="text-end">${r.ctn > 0 ? Number(r.qty || 0).toLocaleString('id-ID') : '-'}</td>
+                    </tr>`).join('');
+                    body._rows = rows;
+                    document.getElementById('apoCheckAll').checked = false;
+                    updateCount();
+                } catch (e) {
+                    body.innerHTML =
+                        '<tr><td colspan="6" class="text-center text-danger">Gagal memuat data.</td></tr>';
+                }
+            }
+
+            async function save() {
+                const body = document.getElementById('apoBody');
+                const err = document.getElementById('apoError');
+                const items = [];
+                document.querySelectorAll('#apoBody .apo-chk:checked').forEach(c => {
+                    const r = body._rows[c.dataset.i];
+                    items.push({
+                        POno: r.POno,
+                        OP: r.OP || '',
+                        poref: r.poref
+                    });
+                });
+                err.classList.add('d-none');
+                if (!items.length) {
+                    err.textContent = 'Pilih minimal satu PO.';
+                    err.classList.remove('d-none');
+                    return;
+                }
+
+                const btn = document.getElementById('btnSaveAddPo');
+                const spin = document.getElementById('apoSpin');
+                btn.disabled = true;
+                spin.classList.remove('d-none');
+                try {
+                    const res = await fetch('{{ route('export.po-add') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf()
+                        },
+                        body: JSON.stringify({
+                            exportpk: apoExportpk,
+                            items
+                        })
+                    });
+                    const json = await res.json();
+                    if (json.buyer) {
+                        document.getElementById('apoIdship').textContent =
+                            'SP' + String(apoExportpk).padStart(4, '0') + ' (' + json.buyer + ')';
+                    }
+                    if (json.success === false) {
+                        body.innerHTML = '<tr><td colspan="6" class="text-center text-danger">' + esc(json
+                            .message) + '</td></tr>';
+                        return;
+                    }
+                    if (!res.ok || !json.success) {
+                        err.textContent = json.message || 'Gagal menyimpan.';
+                        err.classList.remove('d-none');
+                        return;
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('modalAddPo')).hide();
+                    showToast(json.message, 'success');
+                    reloadSpGrid();
+                } catch (e) {
+                    err.textContent = 'Terjadi kesalahan jaringan.';
+                    err.classList.remove('d-none');
+                } finally {
+                    btn.disabled = false;
+                    spin.classList.add('d-none');
+                }
+            }
+
+            // panggil dari menu row: add_po(exportpk)
+            window.add_po = function(exportpk, buyer) {
+                ensureModal();
+                apoExportpk = exportpk;
+                document.getElementById('apoIdship').textContent = 'SP' + String(exportpk).padStart(4, '0') + ' (' + buyer + ')';
+                document.getElementById('apoSearch').value = '';
+                document.getElementById('apoError').classList.add('d-none');
+                const el = document.getElementById('modalAddPo');
+                (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
+                loadList();
+            };
+        })();
     </script>
 @endsection
 
@@ -5096,7 +5721,8 @@
                             </button>
                         </div>
                         <div class="ps-2">
-                            <button type="button" class="sp-refresh-btn" onclick="exportSpExcel()" title="Export List Shipment Plan">
+                            <button type="button" class="sp-refresh-btn" onclick="exportSpExcel()"
+                                title="Export List Shipment Plan">
                                 <img src="{{ asset('public/css/images/iconExcel.png') }}" alt="Export Excel">
                             </button>
                         </div>
@@ -5145,6 +5771,9 @@
                     <button type="button" class="sp-action-item" onclick="onActionClick('export_si')"">
                         <i class="bi bi-file-earmark-richtext"></i> Shipping Instruction
                     </button>
+                    <button type="button" class="sp-action-item" onclick="onActionClick('add_pono')"">
+                        <i class="bi bi-plus-square"></i> Add PO Number
+                    </button>
                     <button type="button" id="menu_publish" class="sp-action-item" onclick="onActionClick('publish')">
                         <i class="bi bi-send-check"></i> Publish
                     </button>
@@ -5158,7 +5787,8 @@
                     <button type="button" id="locked" class="sp-action-item sp-action-disabled d-none">
                         <i class="bi bi-lock"></i> Locked
                     </button>
-                    <button type="button" id="complete_shipment" class="sp-action-item" onclick="onActionClick('complete_shipment')">
+                    <button type="button" id="complete_shipment" class="sp-action-item"
+                        onclick="onActionClick('complete_shipment')">
                         <i class="bi bi-truck"></i> Complete Shipment
                     </button>
                     <div class="sp-action-divider"></div>
@@ -5196,6 +5826,12 @@
     <div class="header d-flex p-4 justify-content-between align-items-center w-100 d-none" id="myHeader2" style="">
         <div id="count2" class="d-none"></div>
         <div class="d-flex gap-4">
+            <div class="delete" id="set_peb" style="width:auto;display:none;">
+                <a href="javascript:void(0)" plain="true" onclick="set_peb();"
+                    style="color: #FFFFFF; text-decoration: none;">
+                    Input PEB
+                </a>
+            </div>
             <div class="delete" id="set_inv" style="width:auto;display:none;">
                 <a href="javascript:void(0)" plain="true" onclick="set_inv();"
                     style="color: #FFFFFF; text-decoration: none;">
