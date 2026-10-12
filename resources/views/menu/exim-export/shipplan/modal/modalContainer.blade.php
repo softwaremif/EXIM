@@ -285,6 +285,10 @@
                         <span>40 ft HC</span>
                     </label>
                     <label class="mc-choice">
+                        <input type="radio" name="ctype" value="45ft">
+                        <span>45 ft</span>
+                    </label>
+                    <label class="mc-choice">
                         <input type="radio" name="ctype" value="LCL">
                         <span>LCL</span>
                     </label>

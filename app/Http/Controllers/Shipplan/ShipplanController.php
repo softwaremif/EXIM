@@ -467,6 +467,14 @@ class ShipplanController extends Controller
 
     public function set_shipplan(Request $request)
     {
+        $gac = $request->input('GAC');
+
+        if (empty($gac) || !strtotime($gac)) {
+            $request->merge([
+                'GAC' => null
+            ]);
+        }
+        
         $validated = $request->validate([
             'ordpk'   => 'required|string',
             'buyer'   => 'nullable|string',
@@ -474,8 +482,8 @@ class ShipplanController extends Controller
             'OP'      => 'nullable|string',
             'factory' => 'nullable|string',
             'popks'   => 'nullable|string',
-            'GAC'     => 'required|date',
-            'contdate'  => 'required|date',   // Ex Factory Date
+            'GAC'     => 'nullable|date',
+            'contdate'  => 'required|date',
             'etd'     => 'required|date|after_or_equal:exdate',
             'vassal'  => 'required|string',
             'totqty'  => 'required|numeric',
@@ -835,7 +843,9 @@ class ShipplanController extends Controller
                 $cbm = 67;
             } else if ($type == '40hc') {
                 $cbm = 76;
-            } else {
+            } else if ($type == '45ft') {
+                $cbm = 86;
+            }else {
                 // LCL: volume diisi manual (boleh desimal, mis. 10.13)
                 $cbm = isset($c['volume']) && $c['volume'] !== '' ? (float) $c['volume'] : null;
             }
@@ -1996,24 +2006,26 @@ class ShipplanController extends Controller
             $ordMap = $ordRows->keyBy('ordpk');
         }
 
-        $exportpkList = $result->pluck('exportpk')->filter()->unique()->values();
+        // pack diambil berdasarkan POno saja (bukan exportpk), karena
+        // pack.exportpk sering masih kosong sampai proses load carton
+        $ponoList = $result->pluck('POno')->filter()->unique()->values();
         $packMap = collect();
         $mifMap = collect();
 
-        if ($exportpkList->isNotEmpty()) {
+        if ($ponoList->isNotEmpty()) {
             $packRows = DB::connection('mysql_andon')
                 ->table('pack')
-                ->whereIn('exportpk', $exportpkList)
-                ->select('exportpk', 'POno', 'part', 'mif')
+                ->whereIn('POno', $ponoList)
+                ->select('POno', 'OP', 'part', 'mif')
                 ->orderBy('packpk')
                 ->get();
 
-            $packMap = $packRows->groupBy('exportpk')->map(fn($items) => $items->first());
+            $packMap = $packRows->groupBy('POno')->map(fn($items) => $items->first());
 
-            // MIF per export + POno dari pack.mif:
+            // MIF per POno + OP dari pack.mif:
             // mif 1 = MIF 1, mif 2 = MIF 2; kalau ada keduanya -> "MIF 1 & MIF 2"
             // (tidak ada pack / mif kosong -> default "MIF 2")
-            $mifMap = $packRows->groupBy(fn($item) => $item->exportpk . '|' . $item->POno)
+            $mifMap = $packRows->groupBy(fn($item) => $item->POno . '|' . $item->OP)
                 ->map(function ($items) {
                     return $items->pluck('mif')
                         ->map(fn($mif) => (int) $mif)
@@ -2027,9 +2039,9 @@ class ShipplanController extends Controller
 
         return $result->values()->map(function ($row, $index) use ($ordMap, $packMap, $mifMap, $offset) {
             $ord = $ordMap->get($row->ordpk);
-            $pack = $packMap->get($row->exportpk);
+            $pack = $packMap->get($row->POno);
 
-            $row->mif = $mifMap->get($row->exportpk . '|' . $row->POno) ?: 'MIF 2';
+            $row->mif = $mifMap->get($row->POno . '|' . $row->OP) ?: 'MIF 2';
 
             $row->no = $offset + $index + 1;
             $row->ordno = !empty($row->OP) ? $row->OP : ($ord->ordno ?? '-');
@@ -2104,7 +2116,11 @@ class ShipplanController extends Controller
 
     public function exportSI(Request $request, $exportpk)
     {
-        $export = DB::table('export')->where('exportpk', $exportpk)->first();
+        $export = DB::table('export')
+            ->leftJoin('vassal', 'vassal.vassalpk', '=', 'export.vassalpk')
+            ->where('export.exportpk', $exportpk)
+            ->select('export.*', 'vassal.typenm')
+            ->first();
 
         if (!$export) {
             abort(404, 'Export tidak ditemukan');
@@ -2218,7 +2234,7 @@ class ShipplanController extends Controller
         $vesselName = $conts->pluck('vessname')->filter()->unique()->implode(' / ');
 
         // Ukuran container: 20ft -> 1X20GP, 40ft -> 1X40GP, 40hc -> 1X40HC
-        $typeLabels = ['20ft' => '1X20GP', '40ft' => '1X40GP', '40hc' => '1X40HC', 'lcl' => 'LCL'];
+        $typeLabels = ['20ft' => '1X20GP', '40ft' => '1X40GP', '40hc' => '1X40HC', '45ft' => '1X45GP', 'lcl' => 'LCL'];
         $containerLines = $conts->values()->map(function ($c) use ($typeLabels) {
             $type = $typeLabels[strtolower($c->type ?? '')] ?? strtoupper($c->type ?? '');
 
@@ -2228,7 +2244,8 @@ class ShipplanController extends Controller
             ];
         });
 
-        $serviceType = $conts->contains(fn($c) => strtolower($c->type ?? '') === 'lcl') ? 'LCL' : 'FCL';
+        // Service type diambil dari vassal.typenm (export.vassalpk -> vassal).
+        $serviceType = $export->typenm ?? '';
 
         // =========================================================
         // Sheet dibangun langsung (tanpa file template) mengikuti format

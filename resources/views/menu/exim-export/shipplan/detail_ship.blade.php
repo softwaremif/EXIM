@@ -3883,7 +3883,8 @@
                 const volumeMap = {
                     '20ft': 33,
                     '40ft': 67,
-                    '40hc': 76
+                    '40hc': 76,
+                    '45ft': 86
                 };
 
                 const volumeInput = el.querySelector('[data-field="volume"]');
@@ -4298,7 +4299,8 @@
                 const volume = {
                     '20ft': 33,
                     '40ft': 67,
-                    '40hc': 76
+                    '40hc': 76,
+                    '45ft': 86
                 };
 
                 if (volume[ctype] !== undefined) {
