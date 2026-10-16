@@ -358,6 +358,9 @@
             </div>
         </div>
 
+        {{-- diisi applyFotoLock(): alasan tombol foto disabled (carton belum semua masuk container) --}}
+        <div class="container-foto-lock-note small text-danger mt-2 d-none"></div>
+
         {{-- BARU: 5 slot foto - cuma Foto 1 yang tampil, sisanya d-none sampai tombol + diklik --}}
         <div class="row g-3 mt-1">
             <div class="col-md-6 container-foto-slot" data-photo-slot="foto1">

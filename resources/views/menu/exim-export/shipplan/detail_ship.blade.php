@@ -3485,6 +3485,9 @@
             function refreshPaneWidgets(paneKey) {
                 const pane = document.querySelector(`.mc-pane[data-pane="${paneKey}"]`);
                 if (!pane || !pane.classList.contains('active')) return;
+                // modal masih tersembunyi (mis. sedang diisi sebelum show) -> tunda,
+                // goTo() di shown.bs.modal yang akan menginisialisasinya
+                if (!document.getElementById('modalCreateContainer')?.classList.contains('show')) return;
 
                 pane.querySelectorAll('[data-field="actcontdate"]').forEach(initArrivalDatetimebox);
             }
@@ -3551,9 +3554,16 @@
                     el.querySelectorAll('[data-field]').forEach(input => {
                         const field = input.dataset.field;
                         // untuk datetimebox, ambil value lewat API easyui (kalau sudah ter-init)
-                        if (input.classList.contains('easyui-datetimebox') && $(input).data(
-                                'datetimebox')) {
-                            existingValues[i][field] = $(input).datetimebox('getValue');
+                        let widgetValue = null;
+                        if (input.classList.contains('easyui-datetimebox') && $(input).data('datetimebox')) {
+                            try {
+                                widgetValue = $(input).datetimebox('getValue');
+                            } catch (err) {
+                                console.warn('[shipplan] baca datetimebox actcontdate gagal:', err);
+                            }
+                        }
+                        if (widgetValue !== null) {
+                            existingValues[i][field] = widgetValue;
                         } else {
                             // widget bisa belum dibuat kalau pane-nya belum pernah dibuka;
                             // nilainya masih menunggu di dataset.presetValue
@@ -3565,8 +3575,12 @@
                 // panel kalender easyui di-append ke <body>, bukan ke kartunya.
                 // tanpa destroy, mengosongkan innerHTML meninggalkan panel yatim yang menumpuk.
                 arrivalList.querySelectorAll('[data-field="actcontdate"]').forEach(input => {
-                    if ($(input).data('datetimebox')) {
-                        $(input).datetimebox('destroy');
+                    try {
+                        if ($(input).data('datetimebox')) {
+                            $(input).datetimebox('destroy');
+                        }
+                    } catch (err) {
+                        console.warn('[shipplan] destroy datetimebox actcontdate gagal:', err);
                     }
                 });
 
@@ -3696,6 +3710,66 @@
                 wrap.classList.toggle('d-none', hiddenLeft === 0);
             }
 
+            // cache status carton per contpk (1 fetch per buka modal), karena
+            // syncContainerFotoTab() membangun ulang kartu tiap kali dipanggil
+            const fotoReadyCache = new Map();
+
+            // ready = total carton > 0 DAN semua carton sudah masuk container di progres muat
+            // ('loaded' = Sudah Masuk Container; 'shipped' juga dihitung karena tahapnya sesudah masuk)
+            function getFotoReadyState(contpk) {
+                if (!fotoReadyCache.has(contpk)) {
+                    const url = `{{ route('containers.progress', ['contpk' => '__CONT_PK__']) }}`.replace('__CONT_PK__', contpk);
+                    const req = fetch(url, {
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            const cartons = data.cartons || [];
+                            const loaded = cartons.filter(c => c.status === 'loaded' || c.status === 'shipped').length;
+                            return {
+                                ready: cartons.length > 0 && loaded === cartons.length,
+                                loaded,
+                                total: cartons.length
+                            };
+                        })
+                        .catch(() => {
+                            fotoReadyCache.delete(contpk); // gagal -> boleh dicoba lagi saat sync berikutnya
+                            return {
+                                ready: false,
+                                error: true
+                            };
+                        });
+                    fotoReadyCache.set(contpk, req);
+                }
+                return fotoReadyCache.get(contpk);
+            }
+
+            // state null = belum diketahui (masih loading / container baru belum tersimpan)
+            function applyFotoLock(cardEl, state) {
+                const ready = !!(state && state.ready);
+                let note;
+                if (!state) {
+                    note = 'Memeriksa status carton...';
+                } else if (state.error) {
+                    note = 'Gagal memuat status carton, upload foto belum bisa dilakukan.';
+                } else if (!ready) {
+                    note = `Upload foto bisa dilakukan setelah semua carton masuk container (${state.loaded}/${state.total}).`;
+                }
+
+                cardEl.querySelectorAll('.btn-camera, .btn-add-foto').forEach(btn => {
+                    btn.disabled = !ready;
+                    btn.title = ready ? '' : note;
+                });
+
+                const noteEl = cardEl.querySelector('.container-foto-lock-note');
+                if (noteEl) {
+                    noteEl.textContent = note || '';
+                    noteEl.classList.toggle('d-none', ready);
+                }
+            }
+
             function clearFotoSlot(slotEl) {
                 slotEl.querySelector('.input-camera').value = '';
                 slotEl.querySelector('.file-name-camera').textContent = '';
@@ -3741,11 +3815,10 @@
                     const contnoInput = arrivalItem?.querySelector('[data-field="contno"]');
                     el.querySelector('.container-foto-vessel').textContent = contnoInput?.value || '-';
 
-                    const start_ship = sourceItem.querySelector('[data-field="start_ship"]');
-                    const btnfoto = el.querySelector('#btn-camera');
-
-                    if (btnfoto) {
-                        btnfoto.disabled = !start_ship?.value?.trim();
+                    // tombol foto dikunci dulu, baru dibuka kalau semua carton sudah masuk container
+                    applyFotoLock(el, null);
+                    if (sourceItem.dataset.contpk) {
+                        getFotoReadyState(sourceItem.dataset.contpk).then(state => applyFotoLock(el, state));
                     }
 
                     // isi ulang tiap slot foto sesuai state terakhir.
@@ -4056,24 +4129,23 @@
                         closetime
                     } = window.__pendingExdateEditData;
 
-                    const [datePart, timePart] = exdate.split(' ');
-                    const [year, month, day] = datePart.split('-');
-                    const formatted = `${day}/${month}/${year} ${timePart.substring(0, 5)}`;
-                    if (exdate) {
-                        $('#exdate').datetimebox('setValue', formatted);
-                    }
+                    // "2026-10-16 14:30:00" -> "16/10/2026 14:30"; null/kosong -> '' (dulu langsung
+                    // .split() dan melempar TypeError kalau shipment belum punya exdate/closetime)
+                    const toDtbox = (value) => {
+                        if (!value) return '';
+                        const [datePart, timePart = '00:00'] = String(value).split(' ');
+                        const [year, month, day] = datePart.split('-');
+                        return `${day}/${month}/${year} ${timePart.substring(0, 5)}`;
+                    };
 
-                    // WAJIB: enable dulu closetime SEBELUM setValue, kalau tidak akan diabaikan
                     if (exdate) {
+                        $('#exdate').datetimebox('setValue', toDtbox(exdate));
+                        // WAJIB: enable dulu closetime SEBELUM setValue, kalau tidak akan diabaikan
                         $('#closetime').datetimebox('enable');
                     }
 
-                    const [datePart2, timePart2] = closetime.split(' ');
-                    const [year2, month2, day2] = datePart2.split('-');
-                    const formatted2 = `${day2}/${month2}/${year2} ${timePart2.substring(0, 5)}`;
-                    // alert(formatted2);
                     if (closetime) {
-                        $('#closetime').datetimebox('setValue', formatted2);
+                        $('#closetime').datetimebox('setValue', toDtbox(closetime));
                     }
 
                     window.__pendingExdateEditData = null; // bersihkan setelah dipakai
@@ -4095,6 +4167,7 @@
                 containerFotoFiles.clear();
                 containerFotoUrls.clear();
                 containerFotoRemoved.clear();
+                fotoReadyCache.clear(); // status carton bisa sudah berubah sejak modal terakhir dibuka
 
                 // dipakai .catch() untuk membedakan gagal ambil data vs gagal merender modal,
                 // dan menunjuk tahap mana yang gagal (error object saja sering tampil kosong)
@@ -4245,6 +4318,9 @@
 
                         // // kosongkan list container lama, lalu isi ulang sesuai data dari server
                         stage = 'containers';
+                        // jaga-jaga kalau hidden.bs.modal belum sempat jalan (dibuka ulang terlalu cepat)
+                        goTo(0);
+                        resetArrivalAndFotoLists();
                         containerList.innerHTML = '';
                         if (data.containers && data.containers.length) {
                             data.containers.forEach(c => addContainerCard(c));
@@ -4261,7 +4337,8 @@
 
 
                         stage = 'show-modal';
-                        new bootstrap.Modal(document.getElementById('modalCreateContainer')).show();
+                        // pakai instance yang sama; new Modal() tiap buka menumpuk instance + listener
+                        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalCreateContainer')).show();
 
                         window.__pendingExdateEditData = {
                             exdate: data.exdate,
@@ -4382,11 +4459,36 @@
                 }
             }
 
+            // hancurkan widget easyui di kartu arrival lalu kosongkan list-nya.
+            // panel kalender easyui ditempel ke <body>, jadi tanpa destroy panelnya yatim & menumpuk.
+            function resetArrivalAndFotoLists() {
+                const arrivalList = document.getElementById('containerArrivalList');
+                if (arrivalList) {
+                    arrivalList.querySelectorAll('[data-field="actcontdate"]').forEach(input => {
+                        try {
+                            if ($(input).data('datetimebox')) $(input).datetimebox('destroy');
+                        } catch (err) {
+                            console.warn('[shipplan] destroy datetimebox actcontdate gagal:', err);
+                        }
+                    });
+                    arrivalList.innerHTML = '';
+                }
+                const fotoList = document.getElementById('containerFotoList');
+                if (fotoList) fotoList.innerHTML = '';
+            }
+
             /*hidden modal edit*/
             document.getElementById('modalCreateContainer').addEventListener('hidden.bs.modal', function() {
                 currentMode = 'create';
                 currentExportpk = null;
                 containerList.innerHTML = '';
+
+                // WAJIB balik ke tab pertama. Kalau modal ditutup saat tab "Container in Factory"
+                // masih aktif, pane itu tetap .active walau modalnya tersembunyi -> saat dibuka
+                // lagi, syncContainerArrivalTab() menginisialisasi datetimebox di modal yang masih
+                // display:none (berulang per kartu) dan muat modal sering gagal sebelum refresh.
+                goTo(0);
+                resetArrivalAndFotoLists();
 
                 // form.reset();
 
@@ -4544,6 +4646,9 @@
                         err.className = 'mc-error-text';
                         err.textContent = messages[0];
                         input.closest('.col-md-6, .col-md-7, .col-md-5, .col-12')?.appendChild(err);
+                    }else {
+                        // error tanpa input terkait (mis. container masih berisi carton)
+                        showToast(messages[0], 'error');
                     }
                 });
 
@@ -5096,6 +5201,7 @@
                     if (!groupedByCarton[groupKey]) {
                         groupedByCarton[groupKey] = {
                             exportdtpks: [], packpks: [], totalPcs: 0, totalCbm: 0, isBundle, isMix,
+                            shipped: false,
                             bundlepk: item.bundlepk || null,
                             displayCarton: isBundle ? (item.bundle_carton ?? item.carton) : item.carton,
                             POno: item.POno || '', OP: item.OP || '', poref: item.poref || '',
@@ -5104,8 +5210,16 @@
                     }
             
                     const g = groupedByCarton[groupKey];
-                    if (item.exportdtpk) g.exportdtpks.push(item.exportdtpk);
-                    if (item.packpk) g.packpks.push(item.packpk);
+                    // API load mengirim array `packpks` / `exportdtpks` per item (sama dengan
+                    // data Blade), bukan `packpk` tunggal. Kalau tidak dibaca, chip hasil JS
+                    // punya data-packpks kosong -> hapus carton gagal sebelum halaman di-refresh.
+                    [].concat(item.exportdtpks ?? item.exportdtpk ?? []).forEach(id => {
+                        if (id !== null && id !== '') g.exportdtpks.push(id);
+                    });
+                    [].concat(item.packpks ?? item.packpk ?? []).forEach(pk => {
+                        if (pk !== null && pk !== '') g.packpks.push(pk);
+                    });
+                    if (item.shipped) g.shipped = true;
                     g.totalPcs += Number(item.pcsp) || 0;
                     g.totalCbm += Number(item.t_cbm) || 0;
             
@@ -5172,7 +5286,8 @@
                 chip.dataset.isMix = data.isMix ? '1' : '0'; // BARU
                 chip.dataset.bundlepk = data.bundlepk ?? '';
                 chip.dataset.poref = data.poref ?? ''; // BARU
-                chip.dataset.shipped = '0';
+                chip.dataset.shipped = data.shipped ? '1' : '0';
+                if (data.shipped) chip.classList.add('ld-chip-shipped');
                 chip.dataset.cbm = roundCbm(data.totalCbm);
                 chip.dataset.smallCartons = JSON.stringify((data.isBundle || data.isMix) ? Array.from(data.smallCartons.values()) : []);
             
@@ -5525,6 +5640,10 @@
             if (!btn) return;
             const chip = btn.closest('.ld-chip');
             if (!chip) return;
+            if (chip.dataset.shipped === '1') {
+                showToast('Carton ini sudah Shipped, tidak bisa dikeluarkan.', 'error');
+                return;
+            }
             const packpks = chip.dataset.packpks;
             const contpk = chip.dataset.contpk;
             const exportpk = {{ $header->exportpk }};
@@ -5547,7 +5666,14 @@
 
         function doRemoveCarton(packpkList, contpk, exportpk, cartonNo, groupKey) {
             const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-            const packpks = packpkList.split(',').map(id => parseInt(id, 10));
+            const packpks = String(packpkList ?? '').split(',')
+                .map(id => parseInt(id, 10))
+                .filter(id => !isNaN(id));
+
+            if (!packpks.length) {
+                showToast('Data carton tidak ditemukan.', 'error');
+                return;
+            }
 
             crConfirmBtn.disabled = true;
             crConfirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memproses, mohon tunggu...';
@@ -6084,8 +6210,10 @@
             const exportpk = @json($header->exportpk);
             const allChips = $(`#loadedChips-${contpk} .ld-chip`);
 
+            // pakai attr (bukan .data) supaya selalu baca nilai terbaru dari DOM,
+            // termasuk chip yang dibuat JS tanpa refresh halaman
             const chips = allChips.filter(function() {
-                return $(this).data('shipped') != 1;
+                return $(this).attr('data-shipped') != '1';
             });
             const shippedCount = allChips.length - chips.length;
 
@@ -6098,12 +6226,12 @@
 
             let packpks = [];
             chips.each(function() {
-                const value = $(this).data('packpks');
+                const value = $(this).attr('data-packpks');
                 if (value) {
                     packpks.push(String(value).split(',').map(x => x.trim()).filter(x => x));
                 }
             });
-            packpks = [...new Set(packpks.flat())];
+            packpks = [...new Set(packpks.flat().map(x => parseInt(x, 10)).filter(x => !isNaN(x)))];
 
 
             if (!packpks.length) {

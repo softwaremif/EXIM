@@ -2807,6 +2807,7 @@
                 const isCancelled = stscancel == 1;
                 $('#spActionMenu .sp-action-divider').toggleClass('d-none', isCancelled);
                 $('#remove').toggleClass('d-none', isCancelled);
+                $('#menu_add_pono').toggleClass('d-none', isCancelled);
                 $('#cancelled').toggleClass('d-none', !isCancelled);
 
                 if (isCancelled) {
@@ -2840,7 +2841,7 @@
                     }
                 } else {
                     if (stsstart == 1) {
-                        $('#complete_shipment').removeClass('d-none');
+                        $('#complete_shipment').addClass('d-none');
                     } else {
                         $('#complete_shipment').addClass('d-none');
                     }
@@ -5215,6 +5216,9 @@
                         err.className = 'mc-error-text';
                         err.textContent = messages[0];
                         input.closest('.col-md-6, .col-md-7, .col-md-5, .col-12')?.appendChild(err);
+                    }else {
+                        // error tanpa input terkait (mis. container masih berisi carton)
+                        showToast(messages[0], 'error');
                     }
                 });
 
@@ -5771,7 +5775,7 @@
                     <button type="button" class="sp-action-item" onclick="onActionClick('export_si')"">
                         <i class="bi bi-file-earmark-richtext"></i> Shipping Instruction
                     </button>
-                    <button type="button" class="sp-action-item" onclick="onActionClick('add_pono')"">
+                    <button type="button" id="menu_add_pono" class="sp-action-item" onclick="onActionClick('add_pono')">
                         <i class="bi bi-plus-square"></i> Add PO Number
                     </button>
                     <button type="button" id="menu_publish" class="sp-action-item" onclick="onActionClick('publish')">
@@ -5781,13 +5785,13 @@
                         onclick="onActionClick('unpublish')">
                         <i class="bi bi-eye-slash"></i> Unpublish
                     </button>
-                    <button type="button" id="unlocked" class="sp-action-item" onclick="onActionClick('lock')">
+                    <button type="button" id="unlocked" class="sp-action-item d-none" onclick="onActionClick('lock')">
                         <i class="bi bi-unlock"></i> Lock Shipment
                     </button>
                     <button type="button" id="locked" class="sp-action-item sp-action-disabled d-none">
                         <i class="bi bi-lock"></i> Locked
                     </button>
-                    <button type="button" id="complete_shipment" class="sp-action-item"
+                    <button type="button" id="complete_shipment" class="sp-action-item d-none"
                         onclick="onActionClick('complete_shipment')">
                         <i class="bi bi-truck"></i> Complete Shipment
                     </button>

@@ -887,6 +887,9 @@ class ShipplanController extends Controller
             throw ValidationException::withMessages($errors);
         }
 
+        // Container lama yang card-nya dihapus di form tidak ikut terkirim -> hapus dari DB.
+        $this->deleteRemovedContainers($data['exportpk'], $containers);
+
         $insertRows = [];
 
         foreach ($containers as $index => $c) {
@@ -1010,6 +1013,47 @@ class ShipplanController extends Controller
         }
 
         return $totalContainer;
+    }
+
+    /**
+     * Hapus container milik export ini yang contpk-nya tidak ada lagi di form.
+     * Container yang masih berisi carton ditolak, user harus unload dulu.
+     */
+    private function deleteRemovedContainers($exportpk, array $containers): void
+    {
+        $keptContpks = array_values(array_filter(array_column($containers, 'contpk')));
+
+        $removed = Container::where('exportpk', $exportpk)
+            ->when($keptContpks, fn($q) => $q->whereNotIn('contpk', $keptContpks))
+            ->get(array_merge(['contpk', 'contno'], array_values(self::FOTO_COLUMNS)));
+
+        if ($removed->isEmpty()) {
+            return;
+        }
+
+        $loaded = DB::connection('mysql_andon')->table('pack')
+            ->whereIn('contpk', $removed->pluck('contpk'))
+            ->distinct()
+            ->pluck('contpk');
+
+        if ($loaded->isNotEmpty()) {
+            $names = $removed->whereIn('contpk', $loaded->all())
+                ->map(fn($r) => $r->contno ?: '#' . $r->contpk)
+                ->implode(', ');
+
+            throw ValidationException::withMessages([
+                'containers' => ['Container ' . $names . ' masih berisi carton. Unload carton terlebih dahulu sebelum menghapus container.'],
+            ]);
+        }
+
+        $folder = public_path('upload/foto_container');
+        foreach ($removed as $row) {
+            foreach (self::FOTO_COLUMNS as $column) {
+                $this->deleteFotoFile($folder, $row->{$column});
+            }
+        }
+
+        Container::whereIn('contpk', $removed->pluck('contpk'))->delete();
     }
 
     // public function available_cartons($exportpk, $contpk)
