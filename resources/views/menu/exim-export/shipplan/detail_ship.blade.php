@@ -6044,7 +6044,8 @@
                     PO: ${escapeHtml(carton.POno || '-')}<br>
                     OP: ${escapeHtml(carton.OP || '-')}<br>
                     ${carton.poref && !(carton.is_bundle || carton.is_mix) ? `Poref: ${escapeHtml(carton.poref)}<br>` : ''}
-                    Qty: ${carton.pcsp || 0} pcs
+                    Qty: ${carton.pcsp || 0} pcs<br>
+                    Tgl Scan: ${formatScanDate(carton.datescan)}
                     ${bundleInfo}
                 `;
                 cpTooltip.classList.remove('d-none');
@@ -6065,6 +6066,13 @@
 
             function escapeHtml(str) {
                 return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+
+            // "2026-10-14 18:53:20" -> "14-10-2026 18:53"
+            function formatScanDate(str) {
+                const m = String(str ?? '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+                if (!m) return '-';
+                return `${m[3]}-${m[2]}-${m[1]}` + (m[4] ? ` ${m[4]}:${m[5]}` : '');
             }
         })();
 
@@ -6584,11 +6592,11 @@
                                             _contpk, _contno, _exportpk, _ordpk, _poNo, _ordno
                                             @if (!$islockCont) onclick="openLoadingModal(
                                                     {{ $c->contpk }},
-                                                    '{{ $c->contno ?? '' }}',
+                                                    {{ json_encode($c->contno ?? '') }},
                                                     {{ $header->exportpk }},
                                                     {{ $header->ordpk }},
-                                                    '{{ $header->POno ?? '' }}',
-                                                    '{{ $header->ordno ?? '' }}'
+                                                    {{ json_encode($header->POno ?? '') }},
+                                                    {{ json_encode($header->ordno ?? '') }}
                                                 )"
                                             @else
                                                 disabled @endif>
@@ -6768,11 +6776,11 @@
                                             class="ld-btn-action {{ $islockCont ? 'ld-btn-locked' : '' }}"
                                             @if (!$islockCont) onclick="openLoadingModal(
                                                     {{ $c->contpk }},
-                                                    '{{ $c->contno ?? '' }}',
+                                                    {{ json_encode($c->contno ?? '') }},
                                                     {{ $header->exportpk }},
                                                     {{ $header->ordpk }},
-                                                    '{{ $header->POno ?? '' }}',
-                                                    '{{ $header->ordno ?? '' }}'
+                                                    {{ json_encode($header->POno ?? '') }},
+                                                    {{ json_encode($header->ordno ?? '') }}
                                                 )"
                                             @else
                                                 disabled @endif>
@@ -6783,7 +6791,7 @@
                                         </button>
 
                                         <button type="button" class="ld-view-progress-btn"
-                                            onclick="openContainerProgressModal({{ $c->contpk }}, '{{ $c->contno }}')">
+                                            onclick="openContainerProgressModal({{ $c->contpk }}, {{ json_encode($c->contno) }})">
                                             <i class="bi bi-grid-3x3-gap-fill"></i> Lihat Progres Muat
                                         </button>
                                     </div>

@@ -21,11 +21,11 @@
                 class="ld-container-visual {{ $isLocked ? 'ld-container-locked' : '' }}"
                 @if (!$isLocked) onclick="openLoadingModal(
                         {{ $c->contpk }},
-                        '{{ $c->contno ?? '' }}',
+                        {{ json_encode($c->contno ?? '') }},
                         {{ $header->exportpk }},
                         {{ $header->ordpk }},
-                        '{{ $header->POno ?? '' }}',
-                        '{{ $header->ordno ?? '' }}'
+                        {{ json_encode($header->POno ?? '') }},
+                        {{ json_encode($header->ordno ?? '') }}
                     )"
                 @else
                     disabled @endif>
@@ -100,11 +100,11 @@
                 class="ld-btn-action {{ $isLocked ? 'ld-btn-locked' : '' }}"
                 @if (!$isLocked) onclick="openLoadingModal(
                         {{ $c->contpk }},
-                        '{{ $c->contno ?? '' }}',
+                        {{ json_encode($c->contno ?? '') }},
                         {{ $header->exportpk }},
                         {{ $header->ordpk }},
-                        '{{ $header->POno ?? '' }}',
-                        '{{ $header->ordno ?? '' }}'
+                        {{ json_encode($header->POno ?? '') }},
+                        {{ json_encode($header->ordno ?? '') }}
                     )"
                 @else
                     disabled @endif>
