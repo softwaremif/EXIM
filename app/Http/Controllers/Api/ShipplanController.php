@@ -178,8 +178,9 @@ class ShipplanController extends Controller
         $contsByExport = $exports->isEmpty()
             ? collect()
             : DB::table('cont')
-                ->whereIn('exportpk', $exports->pluck('exportpk'))
-                ->orderBy('contno')
+                ->leftJoin('fwd', 'fwd.fwdpk', 'cont.fwdpk')
+                ->whereIn('cont.exportpk', $exports->pluck('exportpk'))
+                ->orderBy('cont.contno')
                 ->get()                      
                 ->groupBy('exportpk');
  

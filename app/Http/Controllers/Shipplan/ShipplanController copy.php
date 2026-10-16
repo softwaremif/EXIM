@@ -222,7 +222,7 @@ class ShipplanController extends Controller
                 'poexport.poexportpk',
                 'poexport.invs',
                 'export.buyer',
-                'export.pebno',
+                // 'export.pebno',
                 'export.stsexp',
                 'export.lockship',
                 'export.exdate as extdate',
@@ -241,7 +241,8 @@ class ShipplanController extends Controller
                 'vassal.typenm as vassal',
                 // 'cont.vessname'
                 // DB::raw('SUM(exportdt.qty) AS totqty')
-            );
+            )
+            ->selectRaw("COALESCE(NULLIF(poexport.pebno, ''), export.pebno) AS pebno");
         // ->groupBy('export.exportpk');
 
         /*

@@ -1886,7 +1886,7 @@ class ShipplanController extends Controller
                 'poexport.OP',
                 'poexport.poref',
                 'poexport.poexportpk',
-                'poexport.pebno',
+                // 'poexport.pebno',
                 'poexport.invs',
                 'export.buyer',
                 // 'export.pebno',
@@ -1932,6 +1932,7 @@ class ShipplanController extends Controller
                 END AS is_segel
             ")
             )
+            ->selectRaw("COALESCE(NULLIF(poexport.pebno, ''), export.pebno) AS pebno")
             ->groupBy('poexport.poexportpk');
     }
 

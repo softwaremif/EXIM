@@ -6791,7 +6791,7 @@
                                         </button>
 
                                         <button type="button" class="ld-view-progress-btn"
-                                            onclick="openContainerProgressModal({{ $c->contpk }}, {{ json_encode($c->contno) }})">
+                                            onclick="openContainerProgressModal({{ $c->contpk }}, {{ json_encode($c->contno ?? '') }})">
                                             <i class="bi bi-grid-3x3-gap-fill"></i> Lihat Progres Muat
                                         </button>
                                     </div>
