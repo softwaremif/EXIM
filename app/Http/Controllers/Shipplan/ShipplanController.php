@@ -2889,8 +2889,20 @@ class ShipplanController extends Controller
             'items'         => 'required|array|min:1',
             'items.*.POno'  => 'required|string',
             'items.*.OP'    => 'nullable|string',
-            'items.*.poref' => 'required|string',
+            'items.*.poref' => 'nullable|string',
         ]);
+
+        // poref boleh kosong: cocokkan dengan poref NULL / '' di tabel po
+        $wherePoref = function ($q, $poref) {
+            if ($poref === '') {
+                $q->where(function ($w) {
+                    $w->whereNull('poref')->orWhere('poref', '');
+                });
+            } else {
+                $q->where('poref', $poref);
+            }
+            return $q;
+        };
 
         $exportpk = (int) $request->input('exportpk');
         $items    = $request->input('items');
@@ -2925,7 +2937,7 @@ class ShipplanController extends Controller
             foreach ($items as $it) {
                 $pono  = trim($it['POno']);
                 $op    = isset($it['OP']) ? trim($it['OP']) : '';
-                $poref = trim($it['poref']);
+                $poref = trim((string) ($it['poref'] ?? ''));
 
                 $dupe = DB::table('poexport')
                     ->where('exportpk', $exportpk)->where('POno', $pono)->where('OP', $op)
@@ -2935,15 +2947,15 @@ class ShipplanController extends Controller
                     continue;
                 }
 
-                $cartons = function () use ($andon, $pono, $op, $poref, $buyer) {
+                $cartons = function () use ($andon, $pono, $op, $poref, $buyer, $wherePoref) {
                     return $andon->table('pack')
                         ->whereNull('exportpk')
                         ->where('POno', $pono)
                         ->where('OP', $op)
-                        ->whereIn('popk', function ($q) use ($poref, $buyer) {
+                        ->whereIn('popk', function ($q) use ($poref, $buyer, $wherePoref) {
                             $q->select('popk')->from('po')
-                                ->where('poref', $poref)
                                 ->where(self::PO_BUYER_COL, $buyer);   // buyer dari tabel po
+                            $wherePoref($q, $poref);
                         });
                 };
 
@@ -2956,15 +2968,16 @@ class ShipplanController extends Controller
                 } else {
                     // belum ada carton bebas: valid hanya kalau PO ada di tabel po (buyer sama)
                     // dan memang belum punya pack sama sekali
-                    $poOk = $andon->table('po')
-                        ->where('poref', $poref)->where('POno', $pono)->where('OP', $op)
+                    $poOk = $wherePoref($andon->table('po'), $poref)
+                        ->where('POno', $pono)->where('OP', $op)
                         ->where('po.' . self::PO_BUYER_COL, $buyer)
                         ->exists();
 
                     $hasAnyPack = $andon->table('pack')
                         ->where('POno', $pono)->where('OP', $op)
-                        ->whereIn('popk', function ($q) use ($poref) {
-                            $q->select('popk')->from('po')->where('poref', $poref);
+                        ->whereIn('popk', function ($q) use ($poref, $wherePoref) {
+                            $q->select('popk')->from('po');
+                            $wherePoref($q, $poref);
                         })
                         ->exists();
 
