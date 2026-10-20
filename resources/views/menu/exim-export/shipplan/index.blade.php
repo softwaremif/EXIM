@@ -5689,6 +5689,7 @@
                     <div>
                         <h4 class="sp-title">Shipment Plan</h4>
                     </div>
+                    @if ((int) Session::get('userpk', 0) !== 18)
                     <button type="button" class="btn-create-container" onclick="openPackingPlanModal();">
                         <span class="cc-icon-wrap">
                             <i class="bi bi-box-seam cc-icon-box"></i>
@@ -5700,6 +5701,7 @@
                         </span>
                         <i class="bi bi-arrow-right cc-arrow"></i>
                     </button>
+                    @endif
                 </div>
 
                 {{-- ================= RINGKASAN MINI ================= --}}
