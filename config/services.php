@@ -40,4 +40,9 @@ return [
         'url' => env('PACKING_API_URL', 'http://192.168.0.22/finishing-packing'),
     ],
 
+    // laporan packing list (PDF) di aplikasi finishing-packing, dibuka langsung dari browser
+    'finishing_packing' => [
+        'url' => env('FINISHING_PACKING_URL', 'http://192.168.0.22/finishing-packing'),
+    ],
+
 ];

@@ -232,6 +232,52 @@
             align-items: center;
         }
 
+        /* tombol aksi per PO (hapus PO / download packing list) */
+        .sp-po-actions {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .sp-po-action {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            font-size: 15px;
+            line-height: 1;
+            text-decoration: none !important;
+            transition: background-color .15s;
+        }
+
+        .sp-po-action.text-danger:hover {
+            background-color: rgba(220, 53, 69, .1);
+        }
+
+        .sp-po-action.text-primary:hover {
+            background-color: rgba(13, 110, 253, .1);
+        }
+
+        .sp-po-action-badge {
+            position: absolute;
+            right: -2px;
+            bottom: -2px;
+            min-width: 12px;
+            height: 12px;
+            padding: 0 2px;
+            border-radius: 6px;
+            background: #0d6efd;
+            color: #fff;
+            font-size: 9px;
+            font-weight: 600;
+            line-height: 12px;
+            text-align: center;
+        }
+
         .sp-search-box {
             position: relative;
             /* flex: 1; */
@@ -2374,15 +2420,28 @@
                             {
                                 field: 'po_count',
                                 title: '',
-                                width: 50,
+                                width: 80,
                                 formatter: function(v, row) {
+                                    let html = '';
+
                                     if (v > 1 && row.stscancel < 1) {
-                                        return `<a href="javascript:void(0)" class="text-danger"
-                                                data-bs-toggle="tooltip"
-                                                title="Delete PO number"
-                                                onclick="delete_po(${row.poexportpk}, '${(row.POno || '').replace(/'/g, "\\'")}')">
-                                                <i class="bi bi-trash"></i></a>`;
+                                        html += `<a href="javascript:void(0)" class="sp-po-action text-danger"`
+                                            + ` data-bs-toggle="tooltip" title="Delete PO number"`
+                                            + ` onclick="delete_po(${row.poexportpk}, '${(row.POno || '').replace(/'/g, "\\'")}')">`
+                                            + `<i class="bi bi-trash"></i></a>`;
                                     }
+
+                                    // row.po_mif: daftar po.mif (mysql_andon) PO ini, mis. [2] / [1, 2] -> 1 tombol per MIF
+                                    const mifs = Array.isArray(row.po_mif) && row.po_mif.length ? row.po_mif : [2];
+                                    mifs.forEach(mif => {
+                                        const label = mifs.length > 1 ? `<span class="sp-po-action-badge">${mif}</span>` : '';
+                                        html += `<a href="${packingListPdfUrl(row, mif)}" target="_blank" rel="noopener" class="sp-po-action text-primary"`
+                                            + ` data-bs-toggle="tooltip" title="Download Packing List MIF ${mif}"`
+                                            + ` onclick="event.stopPropagation()">`
+                                            + `<i class="bi bi-file-earmark-pdf"></i>${label}</a>`;
+                                    });
+
+                                    return `<div class="sp-po-actions">${html}</div>`;
                                 }
                             },
                             // {
@@ -2745,6 +2804,17 @@
                 document.getElementById('statTotalQty').textContent = numberFormat(rows.reduce((s, r) => s + (Number(r
                     .qty) || 0), 0));
             }
+
+            // PDF packing list per PO dari aplikasi finishing-packing
+            // (butuh user sudah login di finishing-packing)
+            window.packingListPdfUrl = function(row, mif) {
+                return '{{ rtrim(config('services.finishing_packing.url'), '/') }}/packing/laporan-global/pdf?' + $.param({
+                    po: row.POno || '',
+                    op: row.OP || '',
+                    poref: row.poref || '',
+                    mif: mif,
+                });
+            };
 
             window.reloadSpGrid = function() {
                 $('#dgShipmentPlan').datagrid('load', {

@@ -2147,11 +2147,30 @@ class ShipplanController extends Controller
                 });
         }
 
-        return $result->values()->map(function ($row, $index) use ($ordMap, $packMap, $mifMap, $offset) {
+        // MIF per POno + OP + poref dari po.mif (mysql_andon) -- dipakai
+        // tombol download packing list (parameter mif). po.mif kosong -> 2
+        $poMifMap = collect();
+
+        if ($ponoList->isNotEmpty()) {
+            $poMifMap = DB::connection('mysql_andon')
+                ->table('po')
+                ->whereIn('POno', $ponoList)
+                ->get(['POno', 'OP', 'poref', 'mif'])
+                ->groupBy(fn($item) => $item->POno . '|' . $item->OP . '|' . (string) $item->poref)
+                ->map(fn($items) => $items->pluck('mif')
+                    ->map(fn($mif) => (int) $mif ?: 2)
+                    ->unique()
+                    ->sort()
+                    ->values()
+                    ->all());
+        }
+
+        return $result->values()->map(function ($row, $index) use ($ordMap, $packMap, $mifMap, $poMifMap, $offset) {
             $ord = $ordMap->get($row->ordpk);
             $pack = $packMap->get($row->POno);
 
             $row->mif = $mifMap->get($row->POno . '|' . $row->OP) ?: 'MIF 2';
+            $row->po_mif = $poMifMap->get($row->POno . '|' . $row->OP . '|' . (string) $row->poref) ?: [2];
 
             $row->no = $offset + $index + 1;
             $row->ordno = !empty($row->OP) ? $row->OP : ($ord->ordno ?? '-');
