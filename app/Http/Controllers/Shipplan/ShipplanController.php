@@ -2779,6 +2779,20 @@ class ShipplanController extends Controller
                 'OP' => $newOP,
             ]);
 
+            // popk PO ini (POno + OP + poref) dikeluarkan dari export.popks
+            $removedPopks = $andon->table('po')
+                ->where('POno', $po->POno)->where('OP', $po->OP)
+                ->where(function ($q) use ($po) {
+                    if ((string) $po->poref === '') {
+                        $q->whereNull('poref')->orWhere('poref', '');
+                    } else {
+                        $q->where('poref', $po->poref);
+                    }
+                })
+                ->pluck('popk')->all();
+
+            $this->syncExportPopks($exportpk, [], $removedPopks);
+
             DB::commit();
             $andon->commit();
         } catch (\Throwable $e) {
@@ -2798,6 +2812,27 @@ class ShipplanController extends Controller
             'unassigned' => $unassigned,
             'POno' => $newPOno,
             'OP' => $newOP,
+        ]);
+    }
+
+    // export.popks dipakai available_cartons() sebagai daftar popk yang
+    // carton-nya boleh tampil -- wajib ikut berubah saat PO ditambah/dihapus.
+    private function syncExportPopks($exportpk, array $add = [], array $remove = []): void
+    {
+        $current = DB::table('export')->where('exportpk', $exportpk)->value('popks');
+
+        $remove = collect($remove)->map(fn($v) => (int) $v)->all();
+
+        $popks = collect(explode(',', (string) $current))
+            ->merge($add)
+            ->map(fn($v) => (int) trim($v))
+            ->filter()
+            ->reject(fn($v) => in_array($v, $remove, true))
+            ->unique()
+            ->values();
+
+        DB::table('export')->where('exportpk', $exportpk)->update([
+            'popks' => $popks->implode(','),
         ]);
     }
 
@@ -2929,8 +2964,9 @@ class ShipplanController extends Controller
         try {
             DB::table('export')->where('exportpk', $exportpk)->lockForUpdate()->first();
 
-            $addedPo = [];
-            $totCtn  = 0;
+            $addedPo    = [];
+            $addedPopks = [];
+            $totCtn     = 0;
             $totQty  = 0;
             $skipped = [];
 
@@ -3006,6 +3042,14 @@ class ShipplanController extends Controller
                     'qty'      => $qty,
                 ]);
 
+                $addedPopks = array_merge(
+                    $addedPopks,
+                    $wherePoref($andon->table('po'), $poref)
+                        ->where('POno', $pono)->where('OP', $op)
+                        ->where(self::PO_BUYER_COL, $buyer)
+                        ->pluck('popk')->all()
+                );
+
                 $addedPo[] = $pono;
                 $totCtn   += $ctn;
                 $totQty   += $qty;
@@ -3037,6 +3081,8 @@ class ShipplanController extends Controller
                 'totctn'   => DB::raw('COALESCE(totctn,0) + ' . (int) $totCtn),
                 'qty_list' => DB::raw('COALESCE(qty_list,0) + ' . (int) $totQty),
             ]);
+
+            $this->syncExportPopks($exportpk, $addedPopks);
 
             DB::commit();
             $andon->commit();
