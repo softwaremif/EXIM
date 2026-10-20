@@ -5662,7 +5662,7 @@
                     <div class="d-flex">
                         <div class="sp-search-box">
                             <i class="bi bi-search"></i>
-                            <input type="text" id="spSearch" placeholder="Cari Order No / PO / Peb No / vessname..."
+                            <input type="text" id="spSearch" placeholder="Cari ID Shipplan / Order No / PO / Peb No / vessname..."
                                 onkeyup="onSpSearch()">
                         </div>
 

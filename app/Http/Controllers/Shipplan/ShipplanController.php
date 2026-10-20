@@ -2003,8 +2003,15 @@ class ShipplanController extends Controller
         }
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('export.ordpk', 'like', "%{$search}%")
+            // ID Shipplan = 'SP' + exportpk (pad 4), mis. SP0123 / sp123 / 123
+            $idShip = preg_match('/^\s*(?:SP)?0*(\d+)\s*$/i', $search, $m) ? (int) $m[1] : null;
+
+            $query->where(function ($q) use ($search, $idShip) {
+                if ($idShip !== null) {
+                    $q->orWhere('export.exportpk', $idShip);
+                }
+
+                $q->orWhere('export.ordpk', 'like', "%{$search}%")
                     ->orWhere('poexport.POno', 'like', "%{$search}%")
                     ->orWhere('poexport.OP', 'like', "%{$search}%")
                     ->orWhere('export.buyer', 'like', "%{$search}%")
