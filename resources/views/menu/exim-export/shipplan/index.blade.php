@@ -2436,7 +2436,7 @@
                                     mifs.forEach(mif => {
                                         const label = mifs.length > 1 ? `<span class="sp-po-action-badge">${mif}</span>` : '';
                                         html += `<a href="${packingListPdfUrl(row, mif)}" target="_blank" rel="noopener" class="sp-po-action text-primary"`
-                                            + ` data-bs-toggle="tooltip" title="Download Packing List MIF ${mif}"`
+                                            + ` data-bs-toggle="tooltip" title="Download Packing List"`
                                             + ` onclick="event.stopPropagation()">`
                                             + `<i class="bi bi-file-earmark-pdf"></i>${label}</a>`;
                                     });
