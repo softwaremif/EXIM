@@ -2978,6 +2978,9 @@
                     case 'export_excel':
                         window.open(`{{ url('/export') }}/${exportpk}/print`, '_blank');
                         break;
+                    case 'export_clp':
+                        window.open(`{{ url('/export') }}/clp/${exportpk}`, '_blank');
+                        break;
                     case 'export_si':
                         window.open(`{{ url('/export') }}/si/${exportpk}`, '_blank');
                         break;
@@ -5843,6 +5846,9 @@
                     </button>
                     <button type="button" class="sp-action-item" onclick="onActionClick('export_excel')">
                         <i class="bi bi-file-earmark-spreadsheet"></i> Export Packing List
+                    </button>
+                    <button type="button" class="sp-action-item" onclick="onActionClick('export_clp')">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Export CLP
                     </button>
                     <button type="button" class="sp-action-item" onclick="onActionClick('export_si')"">
                         <i class="bi bi-file-earmark-richtext"></i> Shipping Instruction

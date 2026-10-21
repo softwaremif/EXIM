@@ -186,6 +186,7 @@ Route::post('cancelinvs', [InvoiceController::class, 'cancelinvs'])->name('cance
     Route::get('/exim-export/shipplan/{exportpk}/container-cards-refresh', [ShipplanController::class, 'refreshContainerCards'])->name('shipplan.containerCardsRefresh');
     Route::get('/containers/{contpk}/progress', [ShipplanController::class, 'containerProgress'])->name('containers.progress');
     Route::get('/export/si/{exportpk}', [ShipplanController::class, 'exportSI'])->name('exportSI');
+    Route::get('/export/clp/{exportpk}', [ShipplanController::class, 'exportCLP'])->name('exportCLP');
 
     //set invoice baru
     Route::get('/invoice/options', [ShipplanController::class, 'invoiceOptions'])->name('invoice.options');

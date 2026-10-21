@@ -2701,6 +2701,251 @@ class ShipplanController extends Controller
         return response()->download($tempPath, $filename)->deleteFileAfterSend(true);
     }
 
+    public function exportCLP(Request $request, $exportpk)
+    {
+        $export = DB::table('export')->where('exportpk', $exportpk)->first();
+
+        if (!$export) {
+            abort(404, 'Export tidak ditemukan');
+        }
+
+        $conts = DB::table('cont')
+            ->where('exportpk', $exportpk)
+            ->orderBy('contpk')
+            ->get();
+
+        if ($conts->isEmpty()) {
+            abort(404, 'Container untuk export ini belum ada');
+        }
+
+        // Carton per container diambil dari API Packing (sumber data yang
+        // sama dengan load/progress container) -- BUKAN query langsung ke
+        // mysql_andon, karena DB itu belum tentu sama dengan DB Packing.
+        $cartonsByCont = [];
+        foreach ($conts as $c) {
+            try {
+                $response = \Illuminate\Support\Facades\Http::timeout(30)
+                    ->get($this->packingBaseUrl() . '/api/packing/loaded-cartons-by-container', [
+                        'exportpk' => $exportpk,
+                        'contpk'   => $c->contpk,
+                    ]);
+            } catch (\Throwable $e) {
+                report($e);
+                abort(502, 'Sistem Packing tidak dapat terhubung.');
+            }
+
+            if (!$response->successful()) {
+                abort(502, $response->json('message') ?? 'Gagal memuat data carton dari sistem Packing.');
+            }
+
+            $cartonsByCont[$c->contpk] = collect($response->json('cartons') ?? []);
+        }
+
+        // Style per PO + OP dari table po (popk dari export.popks).
+        $popks = collect(explode(',', (string) $export->popks))
+            ->map(fn($v) => (int) trim($v))->filter()->unique()->values();
+        $styleMap = $popks->isNotEmpty()
+            ? DB::connection('mysql_andon')->table('po')
+                ->whereIn('popk', $popks)
+                ->get(['POno', 'OP', 'style'])
+                ->mapWithKeys(fn($po) => [($po->POno ?? '') . '|' . ($po->OP ?? '') => $po->style])
+            : collect();
+
+        // GW / NW tidak dikirim oleh API Packing -> ambil per packpk dari table pack.
+        $packpks = collect($cartonsByCont)->flatten(1)->pluck('packpks')->flatten()->filter()->unique()->values();
+        $weightMap = collect();
+        foreach ($packpks->chunk(1000) as $chunk) {
+            $weightMap = $weightMap->union(
+                DB::connection('mysql_andon')->table('pack')
+                    ->whereIn('packpk', $chunk->all())
+                    ->get(['packpk', 'gw', 'nw'])
+                    ->keyBy('packpk')
+            );
+        }
+
+        // Ukuran container: 20ft -> 20GP, 40ft -> 40GP, 40hc -> 40HC
+        $typeLabels = ['20ft' => '20GP', '40ft' => '40GP', '40hc' => '40HC', '45ft' => '45GP', 'lcl' => 'LCL'];
+
+        // =========================================================
+        // 1 blok = 1 container, isinya baris per PO (POno + OP) yang
+        // di-load ke container tsb. 1 item dari API = 1 carton fisik
+        // (BUNDLE = 1 carton besar berisi beberapa carton kecil).
+        // =========================================================
+        $blocks = [];
+
+        foreach ($conts as $c) {
+            $cartons = $cartonsByCont[$c->contpk];
+            if ($cartons->isEmpty()) {
+                continue;
+            }
+
+            $lines = [];
+            $lineOf = function ($poNo, $op) use (&$lines, $styleMap) {
+                $key = ($poNo ?? '') . '|' . ($op ?? '');
+                if (!isset($lines[$key])) {
+                    $lines[$key] = [
+                        'POno'    => $poNo ?? '-',
+                        'style'   => $styleMap->get($key) ?? '-',
+                        'ctns'    => 0,
+                        'qty'     => 0,
+                        'gw'      => 0.0,
+                        'nw'      => 0.0,
+                        'cbm'     => 0.0,
+                        'numbers' => [],
+                    ];
+                }
+                return $key;
+            };
+
+            foreach ($cartons as $ctn) {
+                $key = $lineOf($ctn['POno'] ?? null, $ctn['OP'] ?? null);
+                $lines[$key]['ctns']++;
+                $lines[$key]['cbm'] += (float) ($ctn['t_cbm'] ?? 0);
+
+                foreach ($ctn['packpks'] ?? [] as $packpk) {
+                    $lines[$key]['gw'] += (float) ($weightMap->get($packpk)->gw ?? 0);
+                    $lines[$key]['nw'] += (float) ($weightMap->get($packpk)->nw ?? 0);
+                }
+
+                if (!empty($ctn['is_bundle'])) {
+                    // qty & nomor carton dari carton kecil di dalam bundle
+                    // (bundle mix bisa berisi beberapa PO).
+                    foreach ($ctn['small_cartons'] ?? [] as $small) {
+                        $smallKey = $lineOf($small['POno'] ?? null, $small['OP'] ?? null);
+                        $lines[$smallKey]['qty'] += (int) ($small['pcsp'] ?? 0);
+                        $lines[$smallKey]['numbers'][] = (int) $small['carton'];
+                    }
+                } else {
+                    $lines[$key]['qty'] += (int) ($ctn['pcsp'] ?? 0);
+                    $lines[$key]['numbers'][] = (int) $ctn['carton'];
+                }
+            }
+
+            $lines = collect($lines)->map(function ($line) {
+                $min = $line['numbers'] ? min($line['numbers']) : null;
+                $max = $line['numbers'] ? max($line['numbers']) : null;
+                $line['range'] = $min === $max ? (string) $min : "{$min} – {$max}";
+                $line['minCtn'] = (int) $min;
+                return $line;
+            })
+                ->sortBy([['POno', 'asc'], ['minCtn', 'asc']])
+                ->values();
+
+            $type = $typeLabels[strtolower($c->type ?? '')] ?? strtoupper($c->type ?? '');
+
+            $blocks[] = [
+                'equipment' => 'CONTAINER NO : ' . ($c->contno ?? '') . " /\n" . trim($type . ' SEAL NO : ' . ($c->noseal ?? '')),
+                'lines'     => $lines,
+            ];
+        }
+
+        // =========================================================
+        // Sheet: A NO | B PO NO | C STYLE | D CTNS | E QTY | F GW |
+        // G NW | H MEAS | I CARTONS NOS & RANGE | J EQUIPMENT
+        // =========================================================
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('CLP');
+        $spreadsheet->getDefaultStyle()->getFont()->setName('Arial')->setSize(10);
+
+        foreach (['A' => 6, 'B' => 13, 'C' => 18, 'D' => 9, 'E' => 10, 'F' => 12, 'G' => 12, 'H' => 10, 'I' => 16, 'J' => 42] as $col => $width) {
+            $sheet->getColumnDimension($col)->setWidth($width);
+        }
+
+        $sheet->mergeCells('A1:J1')->setCellValue('A1', 'CONTAINER LOAD PLAN');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $headerRow = 3;
+        $headers = ['NO.', 'PO NO', 'STYLE', 'CTNS', 'QTY', 'GW', 'NW', 'MEAS', "CARTONS NOS &\nRANGE", 'EQUIPMENT'];
+        foreach ($headers as $i => $label) {
+            $sheet->setCellValue(chr(ord('A') + $i) . $headerRow, $label);
+        }
+        $headerStyle = $sheet->getStyle("A{$headerRow}:J{$headerRow}");
+        $headerStyle->getFont()->setBold(true)->setUnderline(true);
+        $headerStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('B8CCE4');
+        $headerStyle->getAlignment()->setWrapText(true);
+        $sheet->getRowDimension($headerRow)->setRowHeight(30);
+
+        $row = $headerRow + 1;
+        $no = 1;
+
+        foreach ($blocks as $block) {
+            $blockStart = $row;
+
+            foreach ($block['lines'] as $line) {
+                $sheet->setCellValue('A' . $row, $no++);
+                $sheet->setCellValueExplicit('B' . $row, $line['POno'], DataType::TYPE_STRING);
+                $sheet->setCellValueExplicit('C' . $row, $line['style'], DataType::TYPE_STRING);
+                $sheet->setCellValue('D' . $row, $line['ctns']);
+                $sheet->setCellValue('E' . $row, $line['qty']);
+                $sheet->setCellValue('F' . $row, round($line['gw'], 2));
+                $sheet->setCellValue('G' . $row, round($line['nw'], 2));
+                $sheet->setCellValue('H' . $row, round($line['cbm'], 3));
+                $sheet->setCellValueExplicit('I' . $row, $line['range'], DataType::TYPE_STRING);
+                $sheet->getRowDimension($row)->setRowHeight(24);
+                $row++;
+            }
+
+            $blockEnd = $row - 1;
+            if ($blockEnd > $blockStart) {
+                $sheet->mergeCells("J{$blockStart}:J{$blockEnd}");
+            }
+            $sheet->setCellValue('J' . $blockStart, $block['equipment']);
+        }
+
+        $lastDataRow = $row - 1;
+        $firstDataRow = $headerRow + 1;
+        $totalRow = $row;
+
+        $sheet->mergeCells("A{$totalRow}:C{$totalRow}")->setCellValue('A' . $totalRow, 'TOTAL');
+        if ($lastDataRow >= $firstDataRow) {
+            foreach (['D', 'E', 'F', 'G', 'H'] as $col) {
+                $sheet->setCellValue($col . $totalRow, "=SUM({$col}{$firstDataRow}:{$col}{$lastDataRow})");
+            }
+        }
+        $sheet->getStyle("A{$totalRow}:J{$totalRow}")->getFill()
+            ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFFF00');
+        $sheet->getRowDimension($totalRow)->setRowHeight(24);
+
+        // ---- Styling tabel ----
+        $tableRange = "A{$headerRow}:J{$totalRow}";
+        $sheet->getStyle($tableRange)->getBorders()->getAllBorders()
+            ->setBorderStyle(Border::BORDER_DOTTED);
+        $sheet->getStyle($tableRange)->getBorders()->getOutline()
+            ->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle($tableRange)->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle("J{$firstDataRow}:J{$totalRow}")->getAlignment()->setWrapText(true);
+        $sheet->getStyle("B{$firstDataRow}:B{$lastDataRow}")->getFont()->setBold(true);
+        $sheet->getStyle("I{$firstDataRow}:J{$lastDataRow}")->getFont()->setBold(true);
+
+        $sheet->getStyle("D{$firstDataRow}:E{$totalRow}")->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle("F{$firstDataRow}:G{$lastDataRow}")->getNumberFormat()->setFormatCode('0.00');
+        $sheet->getStyle("F{$totalRow}:G{$totalRow}")->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle("H{$firstDataRow}:H{$totalRow}")->getNumberFormat()->setFormatCode('#,##0.000');
+
+        // ---- Pengaturan cetak: A4 landscape, muat 1 halaman lebar ----
+        $sheet->getPageSetup()
+            ->setPaperSize(PageSetup::PAPERSIZE_A4)
+            ->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)
+            ->setFitToWidth(1)
+            ->setFitToHeight(0);
+        $sheet->getPageMargins()->setTop(0.4)->setBottom(0.4)->setLeft(0.4)->setRight(0.4);
+        $sheet->getPageSetup()->setPrintArea("A1:J{$totalRow}");
+
+        // Nama file sementara dibuat unik supaya tidak bentrok dengan download
+        // lain / sisa file lama; nama yang diterima user tetap $filename.
+        $filename = "CLP_Export_{$exportpk}.xlsx";
+        $tempPath = storage_path('app/tmp/' . uniqid('clp_', true) . '.xlsx');
+
+        $writer = IOFactory::createWriter($spreadsheet, 'Xlsx');
+        $writer->save($tempPath);
+
+        return response()->download($tempPath, $filename)->deleteFileAfterSend(true);
+    }
+
     //SET INVOICE BARU
     // Daftar nomor invoice yang sudah ada (distinct) + jumlah PO yang memakainya
     public function invoiceOptions(Request $request)
