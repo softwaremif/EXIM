@@ -1569,6 +1569,37 @@ class ShipplanController extends Controller
     //     }
     // }
 
+    // PDF packing list diambil server EXIM dari API finishing-packing lalu
+    // diteruskan ke browser, jadi user tidak perlu login di finishing-packing
+    public function packingListPdf(Request $request)
+    {
+        $validated = $request->validate([
+            'op'    => 'required|string',
+            'po'    => 'nullable|string',
+            'poref' => 'nullable|string',
+            'mif'   => 'required|integer',
+        ]);
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(120)
+                ->get(rtrim(config('services.packing.url'), '/') . '/api/packing/laporan-global/pdf', $validated);
+        } catch (\Throwable $e) {
+            report($e);
+            abort(502, 'Gagal menghubungi aplikasi finishing-packing.');
+        }
+
+        if (!$response->successful()) {
+            Log::warning('Download packing list PDF gagal', ['params' => $validated, 'status' => $response->status()]);
+            abort($response->status() === 404 ? 404 : 502, 'Gagal mengambil packing list.');
+        }
+
+        // laporan berupa halaman HTML siap print -> diteruskan apa adanya
+        return response($response->body(), 200, array_filter([
+            'Content-Type'        => $response->header('Content-Type') ?: 'text/html; charset=UTF-8',
+            'Content-Disposition' => $response->header('Content-Disposition'),
+        ]));
+    }
+
     private function getLoadedCartonsFromPacking(int $exportpk, int $contpk)
     {
         try {

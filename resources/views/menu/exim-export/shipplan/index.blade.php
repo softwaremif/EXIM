@@ -2806,9 +2806,9 @@
             }
 
             // PDF packing list per PO dari aplikasi finishing-packing
-            // (butuh user sudah login di finishing-packing)
+            // (lewat proxy EXIM, tidak perlu login di finishing-packing)
             window.packingListPdfUrl = function(row, mif) {
-                return '{{ rtrim(config('services.finishing_packing.url'), '/') }}/packing/laporan-global/pdf?' + $.param({
+                return '{{ route('export.packing-list-pdf') }}?' + $.param({
                     po: row.POno || '',
                     op: row.OP || '',
                     poref: row.poref || '',

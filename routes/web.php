@@ -194,6 +194,9 @@ Route::post('cancelinvs', [InvoiceController::class, 'cancelinvs'])->name('cance
     //hapus PO
     Route::post('/export/po-delete', [ShipplanController::class, 'deletePo'])->name('export.po-delete');
 
+    //download PDF packing list (proxy ke finishing-packing)
+    Route::get('/export/packing-list-pdf', [ShipplanController::class, 'packingListPdf'])->name('export.packing-list-pdf');
+
     //add PO
     Route::get('/export/{exportpk}/available-po', [ShipplanController::class, 'availablePo'])->name('export.available-po');
     Route::post('/export/po-add', [ShipplanController::class, 'addPo'])->name('export.po-add');   
