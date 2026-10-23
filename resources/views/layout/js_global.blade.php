@@ -26,18 +26,98 @@
     }
 
     function changepswd() {
-        // ... (biarkan isi fungsi ini seperti aslinya, tidak berubah)
+        var lowerCaseLetters = /[a-z]/g;
+        var upperCaseLetters = /[A-Z]/g;
+        var numbers = /[0-9]/g;
+        var myInput = document.getElementById("password-2");
+        //var lgn = $("#lgn").val();
+        var password = $("#password-2").val();
+        var confirmPassword = $("#password-3").val();
+        // var ppswd = document.getElementById('spswd').value;
+        // var lgn = document.getElementById('pswdl').value;
+        // if (ppswd!=lgn) {
+        // $('#eror5').show();
+        // }
+        if (password != confirmPassword) {
+            if (password == '') {
+                $("#eror2").show();
+            } else {
+                $("#eror2").hide();
+            }
+
+            if (confirmPassword == '') {
+                $("#eror3").show();
+            } else {
+                $("#eror3").hide();
+            }
+
+            if (!lowerCaseLetters || !upperCaseLetters || !numbers || myInput.value.length < 8) {
+                $("#eror1").show();
+            } else {
+                $("#eror1").hide();
+            }
+
+            $("#eror4").show();
+
+        } else {
+            $('#eror5').hide();
+            $("#eror4").hide();
+            if (password == '') {
+                $("#eror2").show();
+            } else {
+                $("#eror2").hide();
+            }
+
+            if (confirmPassword == '') {
+                $("#eror3").show();
+            } else {
+                $("#eror3").hide();
+            }
+
+            if (!lowerCaseLetters || !upperCaseLetters || !numbers || myInput.value.length < 8) {
+                $("#eror1").show();
+            } else {
+                // $("#eror1").hide();
+                var userpk = $('#userpk').val();
+                var pswd = $('#password-2').val();
+                var cnfrm = $('#password-3').val();
+                if (confirmPassword) {
+                    var formData = {
+                        userpk: userpk,
+                        pswd: pswd,
+                        cnfrm: cnfrm,
+                    };
+                    $.ajax({
+                        type: 'POST',
+                        url: "{{ route('updtpswdb') }}",
+                        data: formData,
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        success: function(data) {
+                            console.log("ini response data : " + JSON.stringify(data));
+                            $('#passwordModal').modal('hide');
+                            $('#formChangePassword').form('reset');
+                        }
+                    });
+                }
+            }
+        }
     }
 
     function showAlert(index, message) {
         if (index == 200 || index == 201 || index == 202 || index == 204) {
             document.getElementById("success-message").textContent = message;
             $('#alert-success').toast('show');
-            setTimeout(() => { $('#alert-success').toast('hide'); }, 3000);
+            setTimeout(() => {
+                $('#alert-success').toast('hide');
+            }, 3000);
         } else {
             document.getElementById("error-message").textContent = message;
             $('#alert-error').toast('show');
-            setTimeout(() => { $('#alert-error').toast('hide'); }, 3000);
+            setTimeout(() => {
+                $('#alert-error').toast('hide');
+            }, 3000);
         }
     }
 
@@ -55,9 +135,9 @@
             const data = await res.json();
 
             const bellIcon = document.getElementById('notifBellIcon');
-            bellIcon.src = data.total > 0
-                ? `{{ asset('public/css/images/notif2.jpeg') }}`
-                : `{{ asset('public/css/images/notif.jpeg') }}`;
+            bellIcon.src = data.total > 0 ?
+                `{{ asset('public/css/images/notif2.jpeg') }}` :
+                `{{ asset('public/css/images/notif.jpeg') }}`;
 
             renderNotificationList(data.notifications);
 
@@ -224,7 +304,8 @@
         startPage = Math.max(1, endPage - maxVisible + 1);
 
         for (let i = startPage; i <= endPage; i++) {
-            html += `<button type="button" class="btn btn-sm ${i === page ? 'btn-dark' : 'btn-light'}" onclick="goToNotifPage(${i})">${i}</button>`;
+            html +=
+                `<button type="button" class="btn btn-sm ${i === page ? 'btn-dark' : 'btn-light'}" onclick="goToNotifPage(${i})">${i}</button>`;
         }
 
         pageNumbersEl.innerHTML = html;
@@ -280,10 +361,11 @@
     .ld-toast {
         border: none;
         border-radius: 14px;
-        box-shadow: 0 12px 32px rgba(16,24,40,.18);
+        box-shadow: 0 12px 32px rgba(16, 24, 40, .18);
         overflow: hidden;
         min-width: 320px;
     }
+
     .ld-toast-body {
         display: flex;
         align-items: flex-start;
@@ -292,37 +374,73 @@
         background: #fff;
         border-left: 4px solid #12A150;
     }
-    .ld-toast.ld-toast-error .ld-toast-body { border-left-color: #D92D20; }
+
+    .ld-toast.ld-toast-error .ld-toast-body {
+        border-left-color: #D92D20;
+    }
 
     .ld-toast-icon {
-        width: 32px; height: 32px; border-radius: 50%;
-        background: #E9F9EE; color: #12A150;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 16px; flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #E9F9EE;
+        color: #12A150;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
     }
-    .ld-toast.ld-toast-error .ld-toast-icon { background: #FEF3F2; color: #D92D20; }
 
-    .ld-toast-text { flex: 1; min-width: 0; }
-    .ld-toast-title { font-weight: 700; font-size: .88rem; color: #101828; }
-    .ld-toast-message { font-size: .8rem; color: #667085; margin-top: 2px; }
+    .ld-toast.ld-toast-error .ld-toast-icon {
+        background: #FEF3F2;
+        color: #D92D20;
+    }
+
+    .ld-toast-text {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .ld-toast-title {
+        font-weight: 700;
+        font-size: .88rem;
+        color: #101828;
+    }
+
+    .ld-toast-message {
+        font-size: .8rem;
+        color: #667085;
+        margin-top: 2px;
+    }
 
     .ld-toast-close {
-        border: none; background: transparent; color: #98A2B3;
-        font-size: 16px; line-height: 1; cursor: pointer; flex-shrink: 0;
+        border: none;
+        background: transparent;
+        color: #98A2B3;
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        flex-shrink: 0;
         padding: 2px;
     }
-    .ld-toast-close:hover { color: #475467; }
+
+    .ld-toast-close:hover {
+        color: #475467;
+    }
 </style>
 
 <script>
-    window.showToast = function (message, type = 'success') {
+    window.showToast = function(message, type = 'success') {
         const toastEl = document.getElementById('ldToast');
         if (!toastEl) {
             console.warn('#ldToast tidak ditemukan di halaman ini.');
             return;
         }
 
-        const bsToast = bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 3500 });
+        const bsToast = bootstrap.Toast.getOrCreateInstance(toastEl, {
+            delay: 3500
+        });
 
         toastEl.classList.remove('ld-toast-error');
         const icon = toastEl.querySelector('.ld-toast-icon i');
