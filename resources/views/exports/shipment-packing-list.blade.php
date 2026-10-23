@@ -1,43 +1,73 @@
 <table>
-    @foreach ($tables as $table)
+    <thead>
         <tr>
-            <th>OP</th>
-            <th>No PO</th>
-            <th>STYLE</th>
+            <th>GIII PO NO.</th>
+            <th>CUSTOMER PO</th>
+            <th>STYLE NO.</th>
             <th>COLOR</th>
-            <th>COLOR CODE</th>
-            <th>IDENTIFIER</th>
-            <th>Case From -To (No Carton)</th>
-            <th>LINE</th>
-            <th>Total PCS/Carton</th>
-            @foreach ($table['sizes'] as $label)
+            <th>UNIT</th>
+            <th colspan="2">CTN NO.</th>
+            <th>TTL CTN</th>
+            @foreach ($sizes as $label)
                 <th>{{ $label }}</th>
             @endforeach
-            <th>Total Carton</th>
-            <th>Total PCS</th>
+            <th>QTY/CTN</th>
+            <th>TTL QTY</th>
+            <th>GROSS WT (KGS)</th>
+            <th>NET WT (KGS)</th>
+            <th>TTL GROSS WT (KGS)</th>
+            <th>TTL NET WT (KGS)</th>
+            <th>MEASUREMENT (CM)</th>
         </tr>
-
-        @foreach ($table['groups'] as $group)
+    </thead>
+    <tbody>
+        @foreach ($lines as $line)
             <tr>
-                <td>{{ $table['OP'] }}</td>
-                <td>{{ $table['POno'] }}</td>
-                <td>{{ $table['style'] }}</td>
-                <td>{{ $table['color'] }}</td>
-                <td>{{ $table['color_code'] }}</td>
-                <td>{{ $group['is_singleton'] ? '►' : '' }}</td>
-                <td>{{ $group['case_range'] }}</td>
-                <td>{{ $group['line'] }}</td>
-                <td>{{ $group['pcs_per_carton'] }}</td>
-                @foreach ($table['sizes'] as $index => $label)
-                    <td>{{ ($group['qty_per_size'][$index] ?? 0) > 0 ? $group['qty_per_size'][$index] : '' }}</td>
+                <td>{{ $line['POno'] }}</td>
+                <td>{{ $line['customer_po'] }}</td>
+                <td>{{ $line['style'] }}</td>
+                <td>{{ $line['color'] }}</td>
+                <td>{{ $line['unit'] }}</td>
+                <td>{{ $line['ctn_from'] }}</td>
+                <td>{{ $line['ctn_to'] }}</td>
+                <td>{{ $line['ttl_ctn'] }}</td>
+                @foreach ($sizes as $label)
+                    <td>{{ $line['qty_per_size'][$label] ?? '' }}</td>
                 @endforeach
-                <td>{{ $group['total_carton'] }}</td>
-                <td>{{ $group['total_pcs'] }}</td>
+                <td>{{ $line['qty_per_ctn'] }}</td>
+                <td>{{ $line['ttl_qty'] }}</td>
+                <td>{{ $line['gw'] }}</td>
+                <td>{{ $line['nw'] }}</td>
+                <td>{{ $line['ttl_gw'] }}</td>
+                <td>{{ $line['ttl_nw'] }}</td>
+                <td>{{ $line['meas'] }}</td>
             </tr>
         @endforeach
 
-        {{-- baris kosong sebagai jarak antar tabel PO --}}
-        <tr><td></td></tr>
-        <tr><td></td></tr>
-    @endforeach
+        {{-- baris kosong sebelum total --}}
+        <tr>
+            <td colspan="{{ 15 + count($sizes) }}"></td>
+        </tr>
+
+        <tr>
+            <td>Total:</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td>0</td>
+            <td></td>
+            <td></td>
+            <td>{{ $totals['ttl_ctn'] }}</td>
+            @foreach ($sizes as $label)
+                <td></td>
+            @endforeach
+            <td></td>
+            <td>{{ $totals['ttl_qty'] }}</td>
+            <td>{{ $totals['gw'] }}</td>
+            <td>{{ $totals['nw'] }}</td>
+            <td>{{ $totals['ttl_gw'] }}</td>
+            <td>{{ $totals['ttl_nw'] }}</td>
+            <td></td>
+        </tr>
+    </tbody>
 </table>
