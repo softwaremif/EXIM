@@ -30,6 +30,9 @@
                 <select id="cartonFilterPo" class="sp-filter-select" onchange="reloadCartonGrid()">
                     <option value="">Semua PO</option>
                 </select>
+                <select id="cartonFilterColor" class="sp-filter-select" onchange="reloadCartonGrid()">
+                    <option value="">Semua Color</option>
+                </select>
 
             </div>
             <div class="ld-modal-toolbar">

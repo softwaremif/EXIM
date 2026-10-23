@@ -489,6 +489,16 @@
                 <span class="cp-legend-item"><span class="cp-dot cp-dot-loading"></span> Sedang Diproses</span>
                 <span class="cp-legend-item"><span class="cp-dot cp-dot-loaded"></span> Sudah Masuk Container</span>
                 <span class="cp-legend-item"><span class="cp-dot cp-dot-shipped"></span> Sudah Shipped</span>
+
+                {{-- BARU: switch tampilan Grid / 3D --}}
+                {{-- <div class="cp-view-switch" role="group">
+                    <button type="button" class="cp-view-btn active" data-cp-view="grid">
+                        <i class="bi bi-grid-3x3-gap"></i> Grid
+                    </button>
+                    <button type="button" class="cp-view-btn" data-cp-view="3d">
+                        <i class="bi bi-box"></i> View 3D
+                    </button>
+                </div> --}}
             </div>
 
             <div class="modal-body cp-body">
@@ -503,6 +513,34 @@
                 </div>
 
                 <div id="cpCartonGrid" class="cp-carton-grid"></div>
+
+                {{-- BARU: view 3D carton di dalam container (Three.js, di-load saat tab dibuka) --}}
+                <div id="cp3dWrap" class="cp-3d-wrap d-none">
+                    <div class="cp-3d-toolbar">
+                        <span class="cp-3d-info" id="cp3dInfo">-</span>
+                        <div class="cp-3d-order">
+                            <label for="cp3dColorBy">Warna</label>
+                            <select id="cp3dColorBy" class="cp-3d-select">
+                                <option value="status">Status</option>
+                                <option value="po">PO</option>
+                                <option value="op">OP</option>
+                            </select>
+                            <label for="cp3dRange">Urutan muat</label>
+                            <input type="range" id="cp3dRange" min="0" max="0" value="0">
+                            <span id="cp3dRangeText" class="ld-mono">0/0</span>
+                            <button type="button" class="cp-3d-btn" id="cp3dPlay" title="Putar animasi muat">
+                                <i class="bi bi-play-fill"></i>
+                            </button>
+                            <button type="button" class="cp-3d-btn" id="cp3dReset" title="Reset kamera">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {{-- legend warna per PO/OP, klik item utk menyorot carton-nya --}}
+                    <div id="cp3dColorLegend" class="cp-3d-legend d-none"></div>
+                    <div id="cp3dCanvas" class="cp-3d-canvas"></div>
+                    <div class="cp-3d-note" id="cp3dNote"></div>
+                </div>
             </div>
 
             <div class="modal-footer cp-footer">

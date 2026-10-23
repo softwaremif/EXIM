@@ -3203,6 +3203,143 @@
             color: #667085;
             font-weight: 600;
         }
+
+        /* ================= VIEW 3D ================= */
+        .cp-view-switch {
+            margin-left: auto;
+            display: inline-flex;
+            background: #EAECF0;
+            border-radius: 8px;
+            padding: 2px;
+        }
+
+        .cp-view-btn {
+            border: none;
+            background: transparent;
+            color: #475467;
+            font-size: .76rem;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .cp-view-btn.active {
+            background: #fff;
+            color: #1E4FD1;
+            box-shadow: 0 1px 3px rgba(16, 24, 40, .12);
+        }
+
+        .cp-3d-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .cp-3d-info {
+            font-size: .78rem;
+            color: #475467;
+            font-weight: 600;
+        }
+
+        .cp-3d-order {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: .76rem;
+            color: #475467;
+        }
+
+        .cp-3d-order input[type=range] {
+            width: 160px;
+        }
+
+        .cp-3d-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            border: 1px solid #D0D5DD;
+            background: #fff;
+            color: #344054;
+            cursor: pointer;
+        }
+
+        .cp-3d-btn:hover {
+            background: #F2F4F7;
+        }
+
+        .cp-3d-canvas {
+            position: relative;
+            width: 100%;
+            height: 46vh;
+            min-height: 300px;
+            border-radius: 10px;
+            overflow: hidden;
+            background: linear-gradient(180deg, #F8FAFF 0%, #E4EAF5 100%);
+            cursor: grab;
+        }
+
+        .cp-3d-canvas:active {
+            cursor: grabbing;
+        }
+
+        .cp-3d-note {
+            font-size: .72rem;
+            color: #98A2B3;
+            margin-top: 8px;
+        }
+
+        .cp-3d-select {
+            height: 30px;
+            border: 1px solid #D0D5DD;
+            border-radius: 8px;
+            font-size: .76rem;
+            padding: 0 6px;
+            color: #344054;
+            background: #fff;
+        }
+
+        .cp-3d-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+            max-height: 84px;
+            overflow-y: auto;
+        }
+
+        .cp-3d-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid #EAECF0;
+            background: #fff;
+            border-radius: 999px;
+            padding: 3px 10px;
+            font-size: .72rem;
+            color: #344054;
+            cursor: pointer;
+        }
+
+        .cp-3d-legend-item:hover {
+            border-color: #98A2B3;
+        }
+
+        .cp-3d-legend-item.active {
+            border-color: #1E4FD1;
+            box-shadow: 0 0 0 2px rgba(30, 79, 209, .15);
+        }
+
+        .cp-3d-legend.has-focus .cp-3d-legend-item:not(.active) {
+            opacity: .45;
+        }
+
+        .cp-3d-legend-item small {
+            color: #98A2B3;
+        }
     </style>
 @endsection
 
@@ -4706,6 +4843,8 @@
                 // isi dropdown filter PO & Order No dari string koma yang sama seperti di header
                 populateFilterOptions('cartonFilterPo', poNo);
                 populateFilterOptions('cartonFilterOrdno', ordno);
+                // opsi color diisi ulang dari respons grid (lihat populateColorOptions)
+                populateFilterOptions('cartonFilterColor', '');
 
                 const searchInput = document.getElementById('cartonSearch');
                 if (searchInput) searchInput.value = '';
@@ -4891,6 +5030,7 @@
                     },
                     onLoadSuccess: function(data) {
                         const dg = $(this);
+                        populateColorOptions(data && data.colors);
 
                         dg.datagrid('getRows').forEach(function(row, index) {
 
@@ -4958,12 +5098,37 @@
                 const searchInput = document.getElementById('cartonSearch');
                 const filterPo = document.getElementById('cartonFilterPo')?.value || '';
                 const filterOrdno = document.getElementById('cartonFilterOrdno')?.value || '';
+                const filterColor = document.getElementById('cartonFilterColor')?.value || '';
                 $('#dgDetailCarton').datagrid('load', {
                     q: searchInput ? searchInput.value : '',
                     filter_po: filterPo,
                     filter_ordno: filterOrdno,
+                    filter_color: filterColor,
                 });
             };
+
+            // isi dropdown Color dari data.colors (dikirim available_cartons),
+            // pilihan yang sedang aktif tetap dipertahankan
+            function populateColorOptions(colors) {
+                const select = document.getElementById('cartonFilterColor');
+                if (!select) return;
+
+                const current = select.value;
+                const values = [...new Set((colors || []).map(v => String(v).trim()).filter(Boolean))];
+                if (current && !values.includes(current)) values.push(current);
+
+                const defaultLabel = select.options[0];
+                select.innerHTML = '';
+                select.appendChild(defaultLabel);
+
+                values.forEach(val => {
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.textContent = val;
+                    select.appendChild(opt);
+                });
+                select.value = current;
+            }
 
             let searchTimer = null;
             window.onCartonSearch = function() {
@@ -6070,6 +6235,8 @@
             const cpLoadingState = document.getElementById('cpLoadingState');
             const cpEmptyState = document.getElementById('cpEmptyState');
             const cpTooltip = document.getElementById('cpTooltip');
+            let cpData = null; // response terakhir containers.progress, dipakai ulang oleh view 3D
+            let cpView = 'grid';
 
             window.openContainerProgressModal = function(contpk, contno) {
                 document.getElementById('cpContno').textContent = contno;
@@ -6078,6 +6245,8 @@
                 cpEmptyState.classList.add('d-none');
                 document.getElementById('cpSummaryText').textContent = '0 carton total';
 
+                cpData = null;
+                setCpView('grid');
                 progressModal.show();
                 loadContainerProgress(contpk);
             };
@@ -6092,7 +6261,9 @@
                     .then(res => res.json())
                     .then(data => {
                         cpLoadingState.classList.add('d-none');
+                        cpData = data;
                         renderCartonGrid(data.cartons || []);
+                        if (cpView === '3d') render3d();
                     })
                     .catch(() => {
                         cpLoadingState.classList.add('d-none');
@@ -6191,7 +6362,8 @@
             }
 
             function escapeHtml(str) {
-                return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
             }
 
             // "2026-10-14 18:53:20" -> "14-10-2026 18:53"
@@ -6200,6 +6372,535 @@
                 if (!m) return '-';
                 return `${m[3]}-${m[2]}-${m[1]}` + (m[4] ? ` ${m[4]}:${m[5]}` : '');
             }
+
+            /* ================= VIEW 3D CARTON DI DALAM CONTAINER ================= */
+            // Posisi carton TIDAK dicatat saat scan, jadi posisi di sini adalah SIMULASI:
+            // carton disusun sesuai urutan scan (datescan) dari dinding belakang ke arah
+            // pintu -- per kolom ditumpuk ke atas, lalu geser ke samping, lalu dinding baru.
+            const CP_3D_LIB = 'https://cdn.jsdelivr.net/npm/three@0.128.0';
+            // ukuran DALAM container (meter): [panjang, lebar, tinggi]
+            const CP_CONT_DIMS = {
+                '20ft': [5.898, 2.352, 2.393],
+                '40ft': [12.032, 2.352, 2.393],
+                '40hc': [12.032, 2.352, 2.698],
+                '45ft': [13.556, 2.352, 2.698],
+            };
+            const CP_STATUS_COLOR = {
+                processing: 0xF79009,
+                loaded: 0x12A150,
+                shipped: 0x98A2B3,
+            };
+            const CP_DEFAULT_DIM = [0.6, 0.4, 0.4];
+
+            const cp3dWrap = document.getElementById('cp3dWrap');
+            const cp3dCanvas = document.getElementById('cp3dCanvas');
+            const cp3dRange = document.getElementById('cp3dRange');
+            const cp3dRangeText = document.getElementById('cp3dRangeText');
+            const cp3dPlay = document.getElementById('cp3dPlay');
+            let cp3dLibPromise = null;
+            let cp3d = null; // { renderer, scene, camera, controls, group, meshes, contDims }
+            let cp3dPlayTimer = null;
+            let cp3dHover = null;
+
+            document.querySelectorAll('[data-cp-view]').forEach(btn => {
+                btn.addEventListener('click', () => setCpView(btn.dataset.cpView));
+            });
+
+            function setCpView(view) {
+                cpView = view;
+                document.querySelectorAll('[data-cp-view]').forEach(b =>
+                    b.classList.toggle('active', b.dataset.cpView === view));
+                cpGrid.classList.toggle('d-none', view !== 'grid');
+                cp3dWrap.classList.toggle('d-none', view !== '3d');
+                stopCp3dPlay();
+                hideTooltip();
+                if (view === '3d' && cpData) render3d();
+            }
+
+            function loadScript(src) {
+                return new Promise((resolve, reject) => {
+                    const s = document.createElement('script');
+                    s.src = src;
+                    s.onload = resolve;
+                    s.onerror = () => reject(new Error('Gagal memuat ' + src));
+                    document.head.appendChild(s);
+                });
+            }
+
+            function loadThree() {
+                if (window.THREE && THREE.OrbitControls) return Promise.resolve();
+                if (!cp3dLibPromise) {
+                    cp3dLibPromise = loadScript(`${CP_3D_LIB}/build/three.min.js`)
+                        .then(() => loadScript(`${CP_3D_LIB}/examples/js/controls/OrbitControls.js`))
+                        .catch(err => {
+                            cp3dLibPromise = null;
+                            throw err;
+                        });
+                }
+                return cp3dLibPromise;
+            }
+
+            function render3d() {
+                const cartons = (cpData && cpData.cartons) || [];
+                if (!cartons.length) {
+                    cp3dWrap.classList.add('d-none');
+                    return;
+                }
+                cp3dWrap.classList.remove('d-none');
+                document.getElementById('cp3dInfo').textContent = 'Memuat library 3D...';
+
+                loadThree()
+                    .then(() => {
+                        if (cpView !== '3d') return;
+                        initCp3d();
+                        buildCp3dScene(cartons, (cpData.container || {}).type);
+                    })
+                    .catch(() => {
+                        document.getElementById('cp3dInfo').textContent =
+                            'Library 3D gagal dimuat. Periksa koneksi internet.';
+                    });
+            }
+
+            function initCp3d() {
+                if (cp3d) {
+                    resizeCp3d();
+                    return;
+                }
+                const renderer = new THREE.WebGLRenderer({
+                    antialias: true,
+                    alpha: true
+                });
+                renderer.setPixelRatio(window.devicePixelRatio || 1);
+                cp3dCanvas.appendChild(renderer.domElement);
+
+                const scene = new THREE.Scene();
+                scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+                const sun = new THREE.DirectionalLight(0xffffff, 0.55);
+                sun.position.set(8, 12, 6);
+                scene.add(sun);
+
+                const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 200);
+                const controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.addEventListener('change', drawCp3d);
+
+                cp3d = {
+                    renderer,
+                    scene,
+                    camera,
+                    controls,
+                    group: null,
+                    meshes: [],
+                    contDims: null
+                };
+
+                const raycaster = new THREE.Raycaster();
+                const pointer = new THREE.Vector2();
+                renderer.domElement.addEventListener('mousemove', e => {
+                    const rect = renderer.domElement.getBoundingClientRect();
+                    pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                    pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                    raycaster.setFromCamera(pointer, camera);
+                    // carton yang diredupkan (filter legend PO/OP) tidak ikut di-hover
+                    const hit = raycaster.intersectObjects(cp3d.meshes.filter(m => m.visible && m.material.depthWrite))[0];
+                    setCp3dHover(hit ? hit.object : null);
+                    if (hit) {
+                        showTooltip(e, hit.object.userData.carton);
+                    } else {
+                        hideTooltip();
+                    }
+                });
+                renderer.domElement.addEventListener('mouseleave', () => {
+                    setCp3dHover(null);
+                    hideTooltip();
+                });
+
+                window.addEventListener('resize', resizeCp3d);
+                resizeCp3d();
+            }
+
+            function setCp3dHover(mesh) {
+                if (cp3dHover === mesh) return;
+                if (cp3dHover) cp3dHover.material.emissive.setHex(0x000000);
+                cp3dHover = mesh;
+                if (mesh) mesh.material.emissive.setHex(0x1E4FD1);
+                drawCp3d();
+            }
+
+            function resizeCp3d() {
+                if (!cp3d || !cp3dCanvas.clientWidth) return;
+                const w = cp3dCanvas.clientWidth;
+                const h = cp3dCanvas.clientHeight;
+                cp3d.renderer.setSize(w, h);
+                cp3d.camera.aspect = w / h;
+                cp3d.camera.updateProjectionMatrix();
+                drawCp3d();
+            }
+
+            function drawCp3d() {
+                if (cp3d) cp3d.renderer.render(cp3d.scene, cp3d.camera);
+            }
+
+            function disposeGroup(group) {
+                group.traverse(obj => {
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) {
+                        if (obj.material.map) obj.material.map.dispose();
+                        obj.material.dispose();
+                    }
+                });
+            }
+
+            // urutkan sesuai waktu scan masuk container; tanpa tgl scan ditaruh paling akhir
+            function sortByScan(cartons) {
+                return cartons.slice().sort((a, b) => {
+                    const da = a.datescan || '￿';
+                    const db = b.datescan || '￿';
+                    if (da !== db) return da < db ? -1 : 1;
+                    return String(a.carton).localeCompare(String(b.carton), undefined, {
+                        numeric: true
+                    });
+                });
+            }
+
+            // simulasi penyusunan: hasil {pos:[x,y,z], size:[dx,dy,dz]} -- x = panjang
+            // container (0 = dinding belakang), y = tinggi, z = lebar
+            function layoutCartons(cartons, contDims) {
+                const [L, W, H] = contDims;
+                const known = cartons.filter(c => Array.isArray(c.dim_m));
+                const fallback = known.length ? [0, 1, 2].map(i =>
+                    known.reduce((s, c) => s + Number(c.dim_m[i]), 0) / known.length) : CP_DEFAULT_DIM;
+
+                let x = 0,
+                    y = 0,
+                    z = 0,
+                    wallDepth = 0,
+                    colWidth = 0;
+                const fallbackVol = fallback[0] * fallback[1] * fallback[2];
+                return cartons.map(c => {
+                    const tCbm = Number(c.t_cbm) || 0;
+                    let d, estimated = false;
+                    if (Array.isArray(c.dim_m)) {
+                        d = c.dim_m.map(Number);
+                    } else if (tCbm > 0) {
+                        // dimensi tidak dikirim -> bentuk mengikuti proporsi default,
+                        // diskalakan supaya volumenya PERSIS t_cbm carton tsb
+                        const k = Math.cbrt(tCbm / fallbackVol);
+                        d = fallback.map(v => v * k);
+                    } else {
+                        d = fallback;
+                        estimated = true;
+                    }
+                    const dx = d[0],
+                        dz = d[1],
+                        dy = d[2];
+
+                    if (y > 0 && y + dy > H) { // kolom penuh -> kolom baru ke samping
+                        y = 0;
+                        z += colWidth;
+                        colWidth = 0;
+                    }
+                    if (z > 0 && z + dz > W) { // dinding penuh -> dinding baru ke arah pintu
+                        x += wallDepth;
+                        y = 0;
+                        z = 0;
+                        wallDepth = 0;
+                        colWidth = 0;
+                    }
+                    const pos = [x, y, z];
+                    y += dy;
+                    colWidth = Math.max(colWidth, dz);
+                    wallDepth = Math.max(wallDepth, dx);
+
+                    return {
+                        carton: c,
+                        pos,
+                        size: [dx, dy, dz],
+                        // CBM resmi = t_cbm (sama dgn kartu container), fallback volume kotak
+                        cbm: tCbm > 0 ? tCbm : (estimated ? 0 : dx * dy * dz),
+                        estimated,
+                        overflow: pos[0] + dx > L + 1e-6
+                    };
+                });
+            }
+
+            function makeTextSprite(text) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#1E4FD1';
+                ctx.font = 'bold 36px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, 128, 32);
+                const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+                    map: new THREE.CanvasTexture(canvas),
+                    depthTest: false
+                }));
+                sprite.scale.set(1.2, 0.3, 1);
+                return sprite;
+            }
+
+            function buildCp3dScene(cartons, contType) {
+                const typeKey = String(contType || '').toLowerCase();
+                const contDims = CP_CONT_DIMS[typeKey] || CP_CONT_DIMS['20ft'];
+                const [L, W, H] = contDims;
+
+                if (cp3d.group) {
+                    disposeGroup(cp3d.group);
+                    cp3d.scene.remove(cp3d.group);
+                }
+                cp3dHover = null;
+                const group = new THREE.Group();
+                // pusatkan container di origin supaya orbit kamera enak
+                group.position.set(-L / 2, -H / 2, -W / 2);
+
+                // lantai + rangka container
+                const floor = new THREE.Mesh(
+                    new THREE.PlaneGeometry(L, W),
+                    new THREE.MeshLambertMaterial({
+                        color: 0xC9D3E3,
+                        side: THREE.DoubleSide
+                    })
+                );
+                floor.rotation.x = -Math.PI / 2;
+                floor.position.set(L / 2, -0.001, W / 2);
+                group.add(floor);
+
+                const shell = new THREE.Mesh(
+                    new THREE.BoxGeometry(L, H, W),
+                    new THREE.MeshBasicMaterial({
+                        color: 0x2F6FED,
+                        transparent: true,
+                        opacity: 0.05,
+                        depthWrite: false
+                    })
+                );
+                shell.position.set(L / 2, H / 2, W / 2);
+                group.add(shell);
+                const frame = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(shell.geometry),
+                    new THREE.LineBasicMaterial({
+                        color: 0x1E4FD1
+                    })
+                );
+                frame.position.copy(shell.position);
+                group.add(frame);
+
+                const door = makeTextSprite('PINTU');
+                door.position.set(L + 0.5, H + 0.25, W / 2);
+                group.add(door);
+
+                // carton
+                const placed = layoutCartons(sortByScan(cartons), contDims);
+                const meshes = [];
+                const edgeMat = new THREE.LineBasicMaterial({
+                    color: 0x344054,
+                    transparent: true,
+                    opacity: 0.55
+                });
+                const overflowEdgeMat = new THREE.LineBasicMaterial({
+                    color: 0xD92D20
+                });
+                let cbm = 0,
+                    estimatedCount = 0,
+                    overflowCount = 0;
+
+                placed.forEach((p, i) => {
+                    const [dx, dy, dz] = p.size;
+                    // sedikit dikecilkan supaya garis antar carton kelihatan
+                    const geo = new THREE.BoxGeometry(dx * 0.985, dy * 0.985, dz * 0.985);
+                    // warna & opacity diatur applyCp3dColors()
+                    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial());
+                    mesh.position.set(p.pos[0] + dx / 2, p.pos[1] + dy / 2, p.pos[2] + dz / 2);
+                    mesh.userData.carton = p.carton;
+                    mesh.userData.order = i;
+                    mesh.userData.estimated = p.estimated;
+
+                    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+                        p.overflow ? overflowEdgeMat : edgeMat);
+                    mesh.add(edges);
+
+                    group.add(mesh);
+                    meshes.push(mesh);
+
+                    cbm += p.cbm;
+                    if (p.estimated) estimatedCount++;
+                    if (p.overflow) overflowCount++;
+                });
+
+                cp3d.scene.add(group);
+                cp3d.group = group;
+                cp3d.meshes = meshes;
+                cp3d.contDims = contDims;
+
+                // kapasitas = volume container di shipment plan (sama dgn kartu container),
+                // fallback volume dalam container fisik
+                const capacity = Number((cpData.container || {}).volume) || (L * W * H);
+                document.getElementById('cp3dInfo').textContent =
+                    `Container ${(contType || '20ft').toUpperCase()} (${L.toFixed(2)} × ${W.toFixed(2)} × ${H.toFixed(2)} m)` +
+                    ` · ${meshes.length} carton · ${cbm.toFixed(3)} / ${capacity} cbm (${Math.round(cbm / capacity * 100)}%)`;
+
+                const notes = [
+                    'Posisi carton adalah simulasi berdasarkan urutan scan (dinding belakang → pintu), bukan posisi fisik aktual.',
+                    'Drag untuk memutar, scroll untuk zoom, klik kanan + drag untuk geser.'
+                ];
+                if (!CP_CONT_DIMS[typeKey]) notes.push(`Tipe container "${contType || '-'}" tidak dikenal, ditampilkan sebagai 20ft.`);
+                if (estimatedCount) notes.push(`${estimatedCount} carton belum punya dimensi & CBM (ditampilkan transparan, ukuran rata-rata, tidak dihitung ke total CBM).`);
+                if (overflowCount) notes.push(`${overflowCount} carton melebihi panjang container (garis merah).`);
+                document.getElementById('cp3dNote').innerHTML = notes.map(escapeHtml).join('<br>');
+
+                cp3dFocusKey = null;
+                applyCp3dColors();
+
+                cp3dRange.max = meshes.length;
+                setCp3dVisibleCount(meshes.length);
+                resetCp3dCamera();
+            }
+
+            /* ---------- Pewarnaan per Status / PO / OP ---------- */
+            const cp3dColorBy = document.getElementById('cp3dColorBy');
+            const cp3dColorLegend = document.getElementById('cp3dColorLegend');
+            const CP_PALETTE = ['#2F6FED', '#E8590C', '#12A150', '#C2255C', '#7048E8', '#0B7285',
+                '#F59F00', '#5C940D', '#D6336C', '#1098AD', '#862E9C', '#A61E4D'
+            ];
+            const CP_MIX_COLOR = '#475467';
+            let cp3dFocusKey = null; // PO/OP yang sedang disorot dari legend
+
+            // PO/OP satu carton; Bundle/Mix lintas PO/OP -> 'Mix PO' / 'Mix OP'
+            function cp3dGroupKey(carton, by) {
+                const field = by === 'po' ? 'POno' : 'OP';
+                const subs = carton.bundle_cartons || [];
+                const values = subs.length ?
+                    [...new Set(subs.map(sc => sc[field] || '-'))] :
+                    [carton[field] || '-'];
+                return values.length > 1 ? (by === 'po' ? 'Mix PO' : 'Mix OP') : values[0];
+            }
+
+            function cp3dColorMap(keys) {
+                const map = {};
+                keys.filter(k => !k.startsWith('Mix ')).forEach((k, i) => {
+                    // > 12 grup: lanjut pakai hue golden-angle supaya tetap beda
+                    map[k] = i < CP_PALETTE.length ? CP_PALETTE[i] :
+                        `hsl(${Math.round((i * 137.508) % 360)}, 65%, 48%)`;
+                });
+                keys.filter(k => k.startsWith('Mix ')).forEach(k => map[k] = CP_MIX_COLOR);
+                return map;
+            }
+
+            function applyCp3dColors() {
+                if (!cp3d) return;
+                const by = cp3dColorBy.value;
+                let colorOf;
+
+                if (by === 'status') {
+                    cp3dColorLegend.classList.add('d-none');
+                    cp3dColorLegend.innerHTML = '';
+                    colorOf = m => CP_STATUS_COLOR[m.userData.carton.status] || CP_STATUS_COLOR.processing;
+                } else {
+                    const counts = {};
+                    cp3d.meshes.forEach(m => {
+                        const k = m.userData.groupKey = cp3dGroupKey(m.userData.carton, by);
+                        counts[k] = (counts[k] || 0) + 1;
+                    });
+                    const keys = Object.keys(counts).sort((a, b) =>
+                        a.localeCompare(b, undefined, {
+                            numeric: true
+                        }));
+                    const colors = cp3dColorMap(keys);
+                    if (cp3dFocusKey && !counts[cp3dFocusKey]) cp3dFocusKey = null;
+
+                    cp3dColorLegend.innerHTML = keys.map(k => `
+                        <span class="cp-3d-legend-item ${k === cp3dFocusKey ? 'active' : ''}" data-key="${escapeHtml(k)}">
+                            <span class="cp-dot" style="background:${colors[k]}"></span>
+                            ${escapeHtml(k)} <small>${counts[k]} ctn</small>
+                        </span>`).join('');
+                    cp3dColorLegend.classList.toggle('has-focus', !!cp3dFocusKey);
+                    cp3dColorLegend.classList.remove('d-none');
+                    colorOf = m => colors[m.userData.groupKey];
+                }
+
+                cp3d.meshes.forEach(m => {
+                    const dimmed = by !== 'status' && cp3dFocusKey && m.userData.groupKey !== cp3dFocusKey;
+                    const opacity = dimmed ? 0.08 : (m.userData.estimated ? 0.55 : 1);
+                    m.material.color.set(colorOf(m));
+                    m.material.transparent = opacity < 1;
+                    m.material.opacity = opacity;
+                    m.material.depthWrite = !dimmed;
+                    m.material.needsUpdate = true;
+                    m.children.forEach(edge => edge.visible = !dimmed);
+                });
+                drawCp3d();
+            }
+
+            cp3dColorBy.addEventListener('change', () => {
+                cp3dFocusKey = null;
+                applyCp3dColors();
+            });
+
+            // klik item legend -> sorot carton PO/OP itu saja; klik lagi -> tampilkan semua
+            cp3dColorLegend.addEventListener('click', e => {
+                const item = e.target.closest('.cp-3d-legend-item');
+                if (!item) return;
+                cp3dFocusKey = cp3dFocusKey === item.dataset.key ? null : item.dataset.key;
+                applyCp3dColors();
+            });
+
+            function setCp3dVisibleCount(n) {
+                if (!cp3d) return;
+                cp3dRange.value = n;
+                cp3dRangeText.textContent = `${n}/${cp3d.meshes.length}`;
+                cp3d.meshes.forEach((m, i) => m.visible = i < n);
+                drawCp3d();
+            }
+
+            function resetCp3dCamera() {
+                if (!cp3d || !cp3d.contDims) return;
+                const [L, W, H] = cp3d.contDims;
+                // pandang dari sisi pintu, agak tinggi & menyamping
+                cp3d.camera.position.set(L * 0.85, H * 1.6 + L * 0.25, W * 1.8 + L * 0.55);
+                cp3d.controls.target.set(0, 0, 0);
+                cp3d.controls.update();
+                drawCp3d();
+            }
+
+            function stopCp3dPlay() {
+                if (cp3dPlayTimer) clearInterval(cp3dPlayTimer);
+                cp3dPlayTimer = null;
+                cp3dPlay.innerHTML = '<i class="bi bi-play-fill"></i>';
+            }
+
+            cp3dRange.addEventListener('input', () => {
+                stopCp3dPlay();
+                setCp3dVisibleCount(Number(cp3dRange.value));
+            });
+
+            cp3dPlay.addEventListener('click', () => {
+                if (!cp3d) return;
+                if (cp3dPlayTimer) {
+                    stopCp3dPlay();
+                    return;
+                }
+                const total = cp3d.meshes.length;
+                let n = Number(cp3dRange.value) >= total ? 0 : Number(cp3dRange.value);
+                // animasi selesai ±6 detik berapapun jumlah cartonnya
+                const step = Math.max(1, Math.ceil(total / 120));
+                cp3dPlay.innerHTML = '<i class="bi bi-pause-fill"></i>';
+                cp3dPlayTimer = setInterval(() => {
+                    n = Math.min(total, n + step);
+                    setCp3dVisibleCount(n);
+                    if (n >= total) stopCp3dPlay();
+                }, 50);
+            });
+
+            document.getElementById('cp3dReset').addEventListener('click', resetCp3dCamera);
+
+            // modal ditutup -> hentikan animasi; ukuran canvas baru valid setelah modal tampil
+            progressModalEl.addEventListener('hidden.bs.modal', () => {
+                stopCp3dPlay();
+                hideTooltip();
+            });
+            progressModalEl.addEventListener('shown.bs.modal', resizeCp3d);
         })();
 
         //hapus all carton

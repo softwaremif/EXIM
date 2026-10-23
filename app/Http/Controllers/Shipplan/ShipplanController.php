@@ -1266,6 +1266,7 @@ class ShipplanController extends Controller
     {
         $filterPo = request('filter_po');
         $filterOrdno = request('filter_ordno');
+        $filterColor = trim((string) request('filter_color', ''));
         $search = request('q');
 
         // 'export' adalah tabel milik EXIM sendiri -- ini SATU-SATUNYA akses
@@ -1314,7 +1315,29 @@ class ShipplanController extends Controller
                 ], $response->status());
             }
 
-            return response()->json($response->json());
+            $data = $response->json() ?? [];
+            $rows = collect($data['rows'] ?? []);
+
+            // color (material) per carton diambil dari details[] -- carton Mix/Bundle
+            // bisa berisi lebih dari 1 color
+            $colorsOf = fn($row) => collect($row['details'] ?? [])
+                ->pluck('material')
+                ->push($row['material'] ?? null)
+                ->map(fn($v) => trim((string) $v))
+                ->filter()
+                ->unique()
+                ->values();
+
+            // opsi dropdown color diambil SEBELUM filter color diterapkan
+            $data['colors'] = $rows->flatMap($colorsOf)->unique()->sort()->values()->all();
+
+            if ($filterColor !== '') {
+                $rows = $rows->filter(fn($row) => $colorsOf($row)->contains($filterColor))->values();
+                $data['rows'] = $rows->all();
+                $data['total'] = $rows->count();
+            }
+
+            return response()->json($data);
         } catch (\Throwable $e) {
             report($e);
 
@@ -1931,7 +1954,29 @@ class ShipplanController extends Controller
                 ], $response->status());
             }
 
-            return response()->json($response->json());
+            $data = $response->json() ?? [];
+
+            // BARU -- tempel t_cbm per carton dari loaded-cartons-by-container (sumber
+            // yang SAMA dengan total CBM di kartu container) supaya view 3D konsisten.
+            // Kedua API memakai grouping & label tampilan yang sama -> cocokkan via
+            // carton|POno|OP|poref (antrian per key utk antisipasi key kembar).
+            $cbmQueue = [];
+            foreach ($this->getLoadedCartonsFromPacking((int) $cont->exportpk, (int) $contpk) as $lc) {
+                $key = ($lc['carton'] ?? '') . '|' . ($lc['POno'] ?? '') . '|' . ($lc['OP'] ?? '') . '|' . ($lc['poref'] ?? '');
+                $cbmQueue[$key][] = (float) ($lc['t_cbm'] ?? 0);
+            }
+            foreach ($data['cartons'] ?? [] as $i => $c) {
+                $key = ($c['carton'] ?? '') . '|' . ($c['POno'] ?? '') . '|' . ($c['OP'] ?? '') . '|' . ($c['poref'] ?? '');
+                $data['cartons'][$i]['t_cbm'] = !empty($cbmQueue[$key]) ? array_shift($cbmQueue[$key]) : null;
+            }
+
+            // BARU -- tipe & volume container ikut dikirim utk view 3D
+            return response()->json(array_merge($data, [
+                'container' => [
+                    'type'   => $cont->type,
+                    'volume' => $cont->volume,
+                ],
+            ]));
         } catch (\Throwable $e) {
             report($e);
 
