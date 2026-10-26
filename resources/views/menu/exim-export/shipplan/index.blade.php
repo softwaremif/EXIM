@@ -232,6 +232,111 @@
             align-items: center;
         }
 
+        /* filter + sort dalam 1 baris; kotak pencarian yang menyusut/melebar */
+        .sp-toolbar {
+            flex-wrap: nowrap;
+        }
+
+        .sp-filters {
+            display: flex;
+            align-items: center;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sp-filters>.ps-2 {
+            flex-shrink: 0;
+        }
+
+        .sp-filters .sp-search-box {
+            flex: 1;
+            min-width: 180px;
+            max-width: 320px;
+        }
+
+        .sp-filters .sp-search-box input {
+            width: 100%;
+        }
+
+        @media (max-width: 1280px) {
+            .sp-toolbar,
+            .sp-filters {
+                flex-wrap: wrap;
+                row-gap: 8px;
+            }
+        }
+
+        /* ================= SORT ================= */
+        .sp-sort {
+            flex-shrink: 0;
+        }
+
+        .sp-sort-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 42px;
+            padding: 0 16px;
+            border: 0;
+            border-radius: 10px;
+            background: #F2F4F7;
+            color: #101828;
+            font-size: .87rem;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: background-color .15s;
+        }
+
+        .sp-sort-btn:hover,
+        .sp-sort-btn[aria-expanded="true"] {
+            background: #E4E7EC;
+        }
+
+        .sp-sort-btn i {
+            font-size: .95rem;
+            color: #344054;
+        }
+
+        .sp-sort-menu {
+            width: 320px;
+            padding: 8px;
+            border: 1px solid #EAECF0;
+            border-radius: 16px;
+            box-shadow: 0 12px 32px rgba(16, 24, 40, .12);
+        }
+
+        .sp-sort-item {
+            display: block;
+            padding: 10px 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            transition: background-color .12s;
+        }
+
+        .sp-sort-item:hover {
+            background: #F9FAFB;
+        }
+
+        .sp-sort-item.active {
+            background: #F2F4F7;
+        }
+
+        .sp-sort-title {
+            display: block;
+            color: #101828;
+            font-size: .92rem;
+            font-weight: 500;
+        }
+
+        .sp-sort-desc {
+            display: block;
+            margin-top: 2px;
+            color: #98A2B3;
+            font-size: .78rem;
+            line-height: 1.35;
+            white-space: normal;
+        }
+
         /* tombol aksi per PO (hapus PO / download packing list) */
         .sp-po-actions {
             display: flex;
@@ -452,10 +557,9 @@
         }
 
         .sp-grid-wrap {
-            background: #fff;
-            border: 1px solid #EAECF0;
+            background: transparent;
+            border: 0;
             overflow: hidden;
-            box-shadow: 0 1px 3px rgba(16, 24, 40, .05);
         }
 
         .datagrid-row-selected {
@@ -557,6 +661,12 @@
         .sp-cell-date {
             font-size: .82rem;
             color: #344054;
+        }
+
+        .sp-cell-time {
+            font-size: .72rem;
+            color: #98A2B3;
+            margin-top: 1px;
         }
 
         .sp-date-empty {
@@ -2023,6 +2133,293 @@
             pointer-events: none;
         }
 
+        /* baris shipment bisa diklik untuk expand daftar OP / PO */
+        .sp-grid-wrap .datagrid-body tr.datagrid-row {
+            cursor: pointer;
+        }
+
+        .sp-po-count-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 1px 8px;
+            border-radius: 10px;
+            background: rgba(13, 110, 253, .08);
+            color: #0d6efd;
+            font-weight: 600;
+            font-size: .75rem;
+        }
+
+        /* detail expand: daftar OP / PO per shipment */
+        .sp-po-detail {
+            padding: 8px 12px 12px 12px;
+            background: #f8f9fb;
+            cursor: default;
+        }
+
+        .sp-po-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: #fff;
+            border: 1px solid #e3e6ec;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .sp-po-table th {
+            padding: 6px 8px;
+            background: #f1f3f7;
+            color: #555;
+            font-size: .75rem;
+            font-weight: 600;
+            border-bottom: 1px solid #e3e6ec;
+        }
+
+        .sp-po-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #eef0f4;
+            vertical-align: middle;
+            white-space: normal;
+        }
+
+        .sp-po-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .sp-po-table tbody tr:hover td {
+            background: #fafbfd;
+        }
+
+        .sp-po-row-disabled td {
+            opacity: .6;
+        }
+
+        .sp-po-row-disabled .sp-po-chk {
+            cursor: not-allowed;
+        }
+
+        /* =========================================================
+           LIST SHIPMENT PLAN - TAMPILAN CARD
+           1 baris shipment = 1 card; jarak antar card lewat border-spacing
+           ========================================================= */
+        .sp-grid-wrap .datagrid-wrap,
+        .sp-grid-wrap .datagrid-view,
+        .sp-grid-wrap .datagrid-body {
+            background: transparent !important;
+            border: 0 !important;
+        }
+
+        /* header kolom: bar tipis membulat */
+        .sp-grid-wrap .datagrid-header {
+            background: #F8F9FC !important;
+            border: 1px solid #EAECF0 !important;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .sp-grid-wrap .datagrid-header td,
+        .sp-grid-wrap .datagrid-header .datagrid-cell {
+            border: 0 !important;
+            background: transparent !important;
+        }
+
+        .sp-grid-wrap .datagrid-header .datagrid-cell span {
+            font-size: .7rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: #667085;
+        }
+
+        .sp-grid-wrap .datagrid-body .datagrid-btable {
+            border-collapse: separate !important;
+            border-spacing: 0 10px;
+        }
+
+        .sp-grid-wrap .datagrid-body td {
+            border: 0 !important;
+        }
+
+        /* sel-sel card */
+        .sp-grid-wrap .datagrid-body tr.datagrid-row>td {
+            background: #fff;
+            border-top: 1px solid #EAECF0 !important;
+            border-bottom: 1px solid #EAECF0 !important;
+            transition: background-color .15s, border-color .15s;
+        }
+
+        .sp-grid-wrap .datagrid-body tr.datagrid-row>td:first-child {
+            border-left: 1px solid #EAECF0 !important;
+            border-radius: 14px 0 0 14px;
+        }
+
+        .sp-grid-wrap .datagrid-body tr.datagrid-row>td:last-child {
+            border-right: 1px solid #EAECF0 !important;
+            border-radius: 0 14px 14px 0;
+        }
+
+        .sp-grid-wrap .datagrid-body tr.datagrid-row .datagrid-cell {
+            padding-top: 12px;
+            padding-bottom: 12px;
+        }
+
+        .sp-grid-wrap .datagrid-body tr.datagrid-row:hover>td {
+            background: #FAFBFF;
+            border-color: #C7D7FE !important;
+        }
+
+        /* card yang sedang terbuka: sudut bawah datar, menyambung ke panel detail */
+        .sp-grid-wrap .datagrid-body tr.datagrid-row.sp-row-open>td {
+            background: #F5F8FF;
+            border-color: #A4BCFD !important;
+            border-bottom-color: transparent !important;
+        }
+
+        .sp-grid-wrap .datagrid-body tr.datagrid-row.sp-row-open>td:first-child {
+            border-radius: 14px 0 0 0;
+        }
+
+        .sp-grid-wrap .datagrid-body tr.datagrid-row.sp-row-open>td:last-child {
+            border-radius: 0 14px 0 0;
+        }
+
+        /* card cancelled sedikit diredupkan */
+        .sp-grid-wrap .datagrid-body tr.datagrid-row.sp-row-cancelled>td {
+            background: #FCFCFD;
+        }
+
+        /* panel detail ditarik ke atas menutup jarak border-spacing */
+        .sp-grid-wrap .datagrid-row-detail {
+            padding: 0 !important;
+        }
+
+        .sp-grid-wrap .sp-po-detail {
+            position: relative;
+            margin-top: -11px;
+            padding: 4px 14px 14px 58px;
+            background: #F5F8FF;
+            border: 1px solid #A4BCFD;
+            border-top: 0;
+            border-radius: 0 0 14px 14px;
+        }
+
+        .sp-grid-wrap .sp-po-detail::before {
+            content: '';
+            position: absolute;
+            left: 22px;
+            top: 0;
+            bottom: 22px;
+            width: 2px;
+            border-radius: 2px;
+            background: #C7D7FE;
+        }
+
+        .sp-grid-wrap .sp-po-table {
+            border-color: #E0E7FF;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+        }
+
+        /* ikon expand: caret (menggantikan ikon plus/minus bawaan easyui) */
+        .sp-grid-wrap .datagrid-row-expander {
+            display: inline-block !important;
+            width: 28px !important;
+            height: 28px !important;
+            border-radius: 8px;
+            background: #F2F4F7 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16' fill='%23475467'%3E%3Cpath d='M6 3.5v9a.5.5 0 0 0 .85.36l4.5-4.5a.5.5 0 0 0 0-.72l-4.5-4.5A.5.5 0 0 0 6 3.5z'/%3E%3C/svg%3E") no-repeat center !important;
+            transition: transform .2s ease, background-color .15s;
+            vertical-align: middle;
+        }
+
+        /* tooltip header via data-tip (mis. ECA) - header easyui dibuat overflow
+           visible supaya tooltip tidak terpotong */
+        .sp-grid-wrap .datagrid-view,
+        .sp-grid-wrap .datagrid-header,
+        .sp-grid-wrap .datagrid-header-inner,
+        .sp-grid-wrap .datagrid-header td:has(.sp-th-tip) .datagrid-cell {
+            overflow: visible !important;
+        }
+
+        .sp-grid-wrap .datagrid-header {
+            position: relative;
+            z-index: 5;
+        }
+
+        .sp-th-tip[data-tip] {
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dashed #98A2B3;
+        }
+
+        .sp-th-tip[data-tip]::after {
+            content: attr(data-tip);
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 50%;
+            transform: translate(-50%, -4px);
+            padding: 5px 10px;
+            border-radius: 6px;
+            background: #101828;
+            color: #fff;
+            font-size: .72rem;
+            font-weight: 500;
+            letter-spacing: 0;
+            text-transform: none;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(16, 24, 40, .18);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity .15s, transform .15s;
+            z-index: 10;
+        }
+
+        .sp-th-tip[data-tip]::before {
+            content: '';
+            position: absolute;
+            top: calc(100% + 3px);
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-bottom-color: #101828;
+            border-top: 0;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity .15s;
+            z-index: 10;
+        }
+
+        .sp-th-tip[data-tip]:hover::after {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, 0);
+        }
+
+        .sp-th-tip[data-tip]:hover::before {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* header OP / PO rata kiri (header lain tetap rata tengah) */
+        .sp-grid-wrap .datagrid-header td[field="ordno"] .datagrid-cell {
+            text-align: left !important;
+        }
+
+        /* easyui mengunci tinggi sel expander 26px -> dilepas supaya tombol caret muat */
+        .sp-grid-wrap td[field="_expander"] .datagrid-cell {
+            height: auto !important;
+        }
+
+        .sp-grid-wrap tr.datagrid-row:hover .datagrid-row-expander {
+            background-color: #E0EAFF !important;
+        }
+
+        .sp-grid-wrap .datagrid-row-expander.datagrid-row-collapse {
+            transform: rotate(90deg);
+            background-color: #D1E0FF !important;
+        }
+
         /*css modal conformasi delete po*/
         .dpo-content {
             border: 0;
@@ -2154,6 +2551,7 @@
 @endsection
 
 @section('js_custom')
+    <script type="text/javascript" src="{!! asset('public/media/jquery-easyui-1.9.15/datagrid-detailview.js') !!}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // cek toast dari sessionStorage (kalau sudah ada dari fitur sebelumnya)
@@ -2304,73 +2702,6 @@
 
         (function() {
 
-            function onLoadGrid() {
-                var dg = $('#dgShipmentPlan');
-                var rows = dg.datagrid('getRows');
-
-                console.log('rows:', rows);
-
-                if (!rows || rows.length === 0) return;
-
-                // 1. bangun data merges
-                var merges = buildMerges(rows);
-                console.log('merges:', merges);
-
-                if (merges.length === 0) return;
-
-                // 2. kolom yang mau di-merge
-                var fields = ['exportpk', 'idship', 'contdate', 'GAC', 'exdate', 'buyer', 'vassal', 'exdate', 'status',
-                    'action', 'type'
-                ];
-
-                // 3. eksekusi merge
-                merges.forEach(function(m) {
-                    fields.forEach(function(f) {
-                        dg.datagrid('mergeCells', {
-                            index: m.index,
-                            field: f,
-                            rowspan: m.rowspan
-                        });
-                    });
-                });
-            }
-
-            function norm(v) {
-                return (v ?? '').toString().trim();
-            }
-
-            function buildMerges(rows) {
-                var merges = [];
-                var start = 0;
-
-                for (var i = 1; i <= rows.length; i++) {
-                    if (
-                        i === rows.length ||
-                        norm(rows[i].exportpk) !== norm(rows[start].exportpk) ||
-                        norm(rows[i].idship) !== norm(rows[start].idship) ||
-                        norm(rows[i].contdate) !== norm(rows[start].contdate) ||
-                        norm(rows[i].GAC) !== norm(rows[start].GAC) ||
-                        norm(rows[i].exdate) !== norm(rows[start].exdate) ||
-                        norm(rows[i].buyer) !== norm(rows[start].buyer) ||
-                        norm(rows[i].vassal) !== norm(rows[start].vassal) ||
-                        norm(rows[i].exdate) !== norm(rows[start].exdate) ||
-                        norm(rows[i].status) !== norm(rows[start].status) ||
-                        norm(rows[i].type) !== norm(rows[start].type) ||
-                        norm(rows[i].action) !== norm(rows[start].action)
-                    ) {
-                        var rowspan = i - start;
-                        if (rowspan > 1) {
-                            merges.push({
-                                index: start,
-                                rowspan: rowspan
-                            });
-                        }
-                        start = i;
-                    }
-                }
-                return merges;
-            }
-
             let selectedPlanIds = new Set();
 
             function isRowCancelled(row) {
@@ -2381,68 +2712,211 @@
                 return row.stscancel == 1 || row.guserpk != guserpk;
             }
 
-            // Checkbox baris cancelled di-disable setelah render supaya benar-benar
-            // tidak bisa diklik, bukan cuma diblokir lewat onBeforeCheck.
-            function disableCancelledCheckboxes(dg) {
-                dg.datagrid('getRows').forEach(function(row, index) {
-                    if (!isRowCancelled(row)) return;
+            // ============================================================
+            // CHECKBOX PER PO (ada di detail expand)
+            // key = poexportpk, value = data PO. Dipakai menu2 / set_inv / set_peb
+            // lewat getCheckedShipPos() sebagai pengganti datagrid('getChecked').
+            // ============================================================
+            const checkedPos = new Map();
 
-                    dg.datagrid('getPanel')
-                        .find('div.datagrid-body table.datagrid-btable tr[datagrid-row-index="' +
-                            index + '"]')
-                        .find('input[type="checkbox"]')
-                        .prop('disabled', true);
+            window.getCheckedShipPos = function() {
+                return Array.from(checkedPos.values());
+            };
+
+            window.clearShipPoChecks = function() {
+                checkedPos.clear();
+                $('#dgShipmentPlan').datagrid('getPanel')
+                    .find('.sp-po-chk, .sp-po-chk-all').prop('checked', false);
+            };
+
+            // tombol hapus PO & download packing list per PO
+            function formatPoActions(row) {
+                let html = '';
+
+                if (row.po_count > 1 && row.stscancel < 1) {
+                    html += `<a href="javascript:void(0)" class="sp-po-action text-danger"`
+                        + ` data-bs-toggle="tooltip" title="Delete PO number"`
+                        + ` onclick="event.stopPropagation(); delete_po(${row.poexportpk}, '${(row.POno || '').replace(/'/g, "\\'")}')">`
+                        + `<i class="bi bi-trash"></i></a>`;
+                }
+
+                // row.po_mif: daftar po.mif (mysql_andon) PO ini, mis. [2] / [1, 2] -> 1 tombol per MIF
+                const mifs = Array.isArray(row.po_mif) && row.po_mif.length ? row.po_mif : [2];
+                mifs.forEach(mif => {
+                    const label = mifs.length > 1 ? `<span class="sp-po-action-badge">${mif}</span>` : '';
+                    html += `<a href="${packingListPdfUrl(row, mif)}" target="_blank" rel="noopener" class="sp-po-action text-primary"`
+                        + ` data-bs-toggle="tooltip" title="Download Packing List"`
+                        + ` onclick="event.stopPropagation()">`
+                        + `<i class="bi bi-file-earmark-pdf"></i>${label}</a>`;
                 });
+
+                return `<div class="sp-po-actions">${html}</div>`;
+            }
+
+            // isi detail expand: daftar OP/PO milik 1 shipment + checkbox
+            function renderPoDetail(parentIndex, parentRow) {
+                const pos = Array.isArray(parentRow.pos) ? parentRow.pos : [];
+                const selectable = pos.filter(p => !isRowCancelled(p));
+                const allChecked = selectable.length > 0 &&
+                    selectable.every(p => checkedPos.has(String(p.poexportpk)));
+
+                const body = pos.map((p, i) => {
+                    const disabled = isRowCancelled(p);
+                    const checked = checkedPos.has(String(p.poexportpk));
+                    return `
+                        <tr class="${disabled ? 'sp-po-row-disabled' : ''}">
+                            <td class="text-center">
+                                <input type="checkbox" class="form-check-input sp-po-chk"
+                                    data-parent="${parentIndex}" data-i="${i}"
+                                    ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+                            </td>
+                            <td>${formatPoActions(p)}</td>
+                            <td>${formatOrderInfo2(p.ordno, p)}</td>
+                            <td class="text-center">${formatQty(p.qty, p)}</td>
+                            <td class="text-center"><span class="sp-cell-mono">${p.invs ? escapeHtml(p.invs) : '-'}</span></td>
+                            <td class="text-center"><span class="sp-cell-mono">${p.pebno ? escapeHtml(p.pebno) : '-'}</span></td>
+                            <td class="text-center">${escapeHtml(p.mif || '-')}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="sp-po-detail">
+                        <table class="sp-po-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:40px" class="text-center">
+                                        <input type="checkbox" class="form-check-input sp-po-chk-all"
+                                            data-parent="${parentIndex}" title="Pilih semua PO di shipment ini"
+                                            ${allChecked ? 'checked' : ''} ${selectable.length ? '' : 'disabled'}>
+                                    </th>
+                                    <th style="width:90px"></th>
+                                    <th>OP / Style</th>
+                                    <th style="width:110px" class="text-center">Qty (PCS)</th>
+                                    <th style="width:150px" class="text-center">INV No</th>
+                                    <th style="width:150px" class="text-center">PEB No</th>
+                                    <th style="width:110px" class="text-center">Factory</th>
+                                </tr>
+                            </thead>
+                            <tbody>${body || '<tr><td colspan="7" class="text-center text-muted">Tidak ada PO</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            function setPoChecked(po, checked) {
+                const id = String(po.poexportpk);
+                if (checked) checkedPos.set(id, po);
+                else checkedPos.delete(id);
+            }
+
+            // checkbox per PO
+            $(document).on('change', '.sp-grid-wrap .sp-po-chk', function(e) {
+                e.stopPropagation();
+                const parentIndex = Number(this.dataset.parent);
+                const parentRow = $('#dgShipmentPlan').datagrid('getRows')[parentIndex];
+                const po = parentRow && parentRow.pos ? parentRow.pos[Number(this.dataset.i)] : null;
+                if (!po || isRowCancelled(po)) return;
+
+                setPoChecked(po, this.checked);
+
+                const detail = $(this).closest('.sp-po-detail');
+                const boxes = detail.find('.sp-po-chk:not(:disabled)');
+                detail.find('.sp-po-chk-all').prop('checked', boxes.length > 0 && boxes.length === boxes.filter(':checked').length);
+
+                menu2();
+            });
+
+            // checkbox "pilih semua PO" di header detail
+            $(document).on('change', '.sp-grid-wrap .sp-po-chk-all', function(e) {
+                e.stopPropagation();
+                const parentIndex = Number(this.dataset.parent);
+                const parentRow = $('#dgShipmentPlan').datagrid('getRows')[parentIndex];
+                if (!parentRow) return;
+
+                const checked = this.checked;
+                (parentRow.pos || []).forEach(po => {
+                    if (!isRowCancelled(po)) setPoChecked(po, checked);
+                });
+                $(this).closest('.sp-po-detail').find('.sp-po-chk:not(:disabled)').prop('checked', checked);
+
+                menu2();
+            });
+
+            // klik baris shipment -> buka / tutup daftar OP & PO.
+            // Tidak lewat onClickRow karena handler expander bawaan detailview
+            // juga terpasang di elemen yang sama (bisa ter-toggle 2x).
+            $(document).on('click', '.sp-grid-wrap .datagrid-body tr.datagrid-row', function(e) {
+                if ($(e.target).closest('.datagrid-row-expander, a, button, input').length) return;
+
+                const dg = $('#dgShipmentPlan');
+                const index = Number($(this).attr('datagrid-row-index'));
+                const expander = dg.datagrid('getExpander', index);
+                dg.datagrid(expander.hasClass('datagrid-row-expand') ? 'expandRow' : 'collapseRow', index);
+                dg.datagrid('fixRowHeight');
+            });
+
+            function formatShipmentInfo(value, row) {
+                const ops = Array.isArray(row.ops) && row.ops.length ? row.ops : [row.OP || '-'];
+                const ponos = Array.isArray(row.ponos) ? row.ponos : [];
+
+                return `
+                    <div class="cell-stack">
+                        <div class="cs-main">${escapeHtml(ops.join(', '))}</div>
+                        <div class="cs-sub">${escapeHtml(row.buyer || '-')}</div>
+                        <div class="cs-sub">PO : ${escapeHtml(ponos.join(', ') || '-')}</div>
+                        <div class="cs-sub"><span class="sp-po-count-chip"><i class="bi bi-list-ul"></i> ${row.po_count || 0} PO</span></div>
+                    </div>
+                `;
             }
 
             function initGrid() {
                 $('#dgShipmentPlan').datagrid({
-                    url: "{{ route('shipplan.getListExport') }}", // sesuaikan dengan route controller kamu nanti
+                    url: "{{ route('shipplan.getListExportGrouped') }}",
+                    view: detailview,
                     width: '100%',
                     height: 'auto',
                     fitColumns: true, // WAJIB true untuk kasus ini
                     rownumbers: false,
-                    singleSelect: false,
+                    singleSelect: true,
                     showHeader: true,
-                    striped: true,
+                    striped: false,
                     border: false,
                     pagination: true,
                     pageSize: 100,
                     pageList: [100, 200, 300, 400, 500],
                     method: 'get',
+                    detailFormatter: function(index) {
+                        return `<div class="sp-po-detail-host" data-index="${index}"></div>`;
+                    },
+                    onExpandRow: function(index, row) {
+                        const dg = $(this);
+                        const host = dg.datagrid('getRowDetail', index).find('.sp-po-detail-host');
+                        host.html(renderPoDetail(index, row));
+                        host.find('[data-bs-toggle="tooltip"]').each(function() {
+                            bootstrap.Tooltip.getOrCreateInstance(this);
+                        });
+                        dg.datagrid('options').finder.getTr(this, index).addClass('sp-row-open');
+                        dg.datagrid('fixDetailRowHeight', index);
+                    },
+                    onCollapseRow: function(index) {
+                        $(this).datagrid('options').finder.getTr(this, index).removeClass('sp-row-open');
+                    },
                     columns: [
                         [{
-                                field: 'ck',
+                                // kolom expander ditaruh di view utama (bukan frozen) supaya
+                                // 1 baris = 1 tabel = 1 card; ikon caret diatur lewat CSS
+                                field: '_expander',
                                 title: '',
-                                width: 50,
-                                checkbox: 'true'
+                                expander: true,
+                                width: 46,
+                                fixed: true,
                             },
                             {
-                                field: 'po_count',
-                                title: '',
-                                width: 80,
-                                formatter: function(v, row) {
-                                    let html = '';
-
-                                    if (v > 1 && row.stscancel < 1) {
-                                        html += `<a href="javascript:void(0)" class="sp-po-action text-danger"`
-                                            + ` data-bs-toggle="tooltip" title="Delete PO number"`
-                                            + ` onclick="delete_po(${row.poexportpk}, '${(row.POno || '').replace(/'/g, "\\'")}')">`
-                                            + `<i class="bi bi-trash"></i></a>`;
-                                    }
-
-                                    // row.po_mif: daftar po.mif (mysql_andon) PO ini, mis. [2] / [1, 2] -> 1 tombol per MIF
-                                    const mifs = Array.isArray(row.po_mif) && row.po_mif.length ? row.po_mif : [2];
-                                    mifs.forEach(mif => {
-                                        const label = mifs.length > 1 ? `<span class="sp-po-action-badge">${mif}</span>` : '';
-                                        html += `<a href="${packingListPdfUrl(row, mif)}" target="_blank" rel="noopener" class="sp-po-action text-primary"`
-                                            + ` data-bs-toggle="tooltip" title="Download Packing List"`
-                                            + ` onclick="event.stopPropagation()">`
-                                            + `<i class="bi bi-file-earmark-pdf"></i>${label}</a>`;
-                                    });
-
-                                    return `<div class="sp-po-actions">${html}</div>`;
-                                }
+                                field: 'ordno',
+                                title: 'OP / PO',
+                                width: 250,
+                                formatter: formatShipmentInfo,
                             },
                             // {
                             //     field: 'exportpk',
@@ -2458,13 +2932,6 @@
                             //         }
                             //     }
                             // },
-                            {
-                                field: 'ordno',
-                                title: 'OP/Style',
-                                width: 250,
-                                align: 'center',
-                                formatter: formatOrderInfo2,
-                            },
                             {
                                 field: 'idship',
                                 title: 'ID Shipplan<br>/PIC',
@@ -2490,18 +2957,26 @@
                                 },
                             },
                             {
+                                // export.contdate
                                 field: 'contdate',
-                                title: 'Container<br>Arrival',
+                                title: '<span class="sp-th-tip" data-tip="Estimated Container Arrival">ECA</span>',
                                 width: 120,
                                 formatter: v => v ? `<span class="sp-cell-date">${formatDate(v)}</span>` :
                                     `<span class="sp-cell-date sp-date-empty">-</span>`,
                             },
                             {
-                                field: 'extdate',
-                                title: 'Actual<br>Ex-Factory',
+                                // export.exdate
+                                field: 'exdate',
+                                title: 'Ex-Factory<br>Deadline',
                                 width: 120,
-                                formatter: v => v ? `<span class="sp-cell-date">${formatDate(v)}</span>` :
-                                    `<span class="sp-cell-date sp-date-empty">-</span>`,
+                                formatter: v => formatDateTimeCell(v),
+                            },
+                            {
+                                // export.closetime
+                                field: 'closetime',
+                                title: 'Closing<br>Due',
+                                width: 120,
+                                formatter: v => formatDateTimeCell(v),
                             },
                             {
                                 field: 'GAC',
@@ -2542,13 +3017,16 @@
                                 align: 'center',
                                 formatter: formatQty,
                             },
-                            {
-                                field: 'pebno',
-                                title: 'PEB No',
-                                width: 130,
-                                formatter: v =>
-                                    `<span class="sp-cell-mono">${v ? escapeHtml(v) : '-'}</span>`,
-                            },
+                            // {
+                            //     field: 'pebno',
+                            //     title: 'PEB No',
+                            //     width: 130,
+                            //     formatter: function(v, row) {
+                            //         // PEB bisa beda per PO -> tampilkan daftar uniknya
+                            //         const list = [...new Set((row.pos || [row]).map(p => p.pebno).filter(Boolean))];
+                            //         return `<span class="sp-cell-mono">${list.length ? list.map(escapeHtml).join('<br>') : '-'}</span>`;
+                            //     },
+                            // },
                             {
                                 field: 'type',
                                 title: 'Container<br>Type',
@@ -2652,29 +3130,15 @@
                         return !isRowCancelled(row);
                     },
                     onLoadSuccess: function(data) {
-                        onLoadGrid();
-                        disableCancelledCheckboxes($(this));
+                        // data baru -> pilihan PO lama dilepas (sama seperti
+                        // checkbox datagrid yang ter-reset saat load)
+                        const hadChecks = checkedPos.size > 0;
+                        checkedPos.clear();
+                        if (hadChecks) menu2();
+
                         updateStats(data.rows || []);
                         updateBulkButton();
                         fixHeaderAlignment(); // panggil setelah data ter-render
-                    },
-                    onCheck: function() {
-                        menu2();
-                    },
-                    onCheckAll: function(rows) {
-                        // checkAll EasyUI mem-bypass onBeforeCheck, jadi baris
-                        // cancelled harus dilepas kembali secara manual.
-                        const dg = $(this);
-                        rows.forEach(function(row, index) {
-                            if (isRowCancelled(row)) dg.datagrid('uncheckRow', index);
-                        });
-                        menu2();
-                    },
-                    onUncheck: function() {
-                        menu2();
-                    },
-                    onUncheckAll: function() {
-                        menu2();
                     },
 
                     onResize: fixHeaderAlignment
@@ -2697,7 +3161,6 @@
                         <div class="cs-sub">${row.buyer ?? '-'}</div>
                         <div class="cs-sub">PO/Style : ${row.POno ? row.POno : row.style}</div>
                         <div class="cs-sub">POref : ${row.poref ?? '-'}</div>
-                        <div class="cs-sub"><b>${row.invs ? 'INV : '+row.invs : 'INV : -'}</b></div>
                     </div>
                 </div>
             `;
@@ -2823,7 +3286,8 @@
                     vassal: document.getElementById('spFilterVassal').value || '',
                     sortlistByDate: document.getElementById('sortlistByDate').value || '',
                     status: document.getElementById('spFilterStatus').value || '',
-                    searchByRangeDay: document.getElementById('filterday').value || '',
+                    searchByRangeDay: $('#filterday').combobox('getValue') || '',
+                    searchByRangeEca: $('#filterdayEca').combobox('getValue') || '',
                 });
             };
 
@@ -2841,7 +3305,8 @@
                     vassal: document.getElementById('spFilterVassal').value || '',
                     sortlistByDate: document.getElementById('sortlistByDate').value || '',
                     status: document.getElementById('spFilterStatus').value || '',
-                    searchByRangeDay: document.getElementById('filterday').value || '',
+                    searchByRangeDay: $('#filterday').combobox('getValue') || '',
+                    searchByRangeEca: $('#filterdayEca').combobox('getValue') || '',
                 };
 
                 window.location.href = '{{ route('export.excel') }}?' + $.param(params);
@@ -3211,6 +3676,14 @@
             return `${day}/${month}/${year}`;
         }
 
+        // tanggal + jam (kolom datetime), mis. "28/10/2026" dan "17:00" di bawahnya
+        function formatDateTimeCell(value) {
+            if (!value) return `<span class="sp-cell-date sp-date-empty">-</span>`;
+            const time = (String(value).split(' ')[1] || '').substring(0, 5);
+            return `<span class="sp-cell-date">${formatDate(value)}</span>` +
+                (time && time !== '00:00' ? `<div class="sp-cell-time">${time}</div>` : '');
+        }
+
         // function formatDate(dateStr) {
         //     const d = new Date(dateStr);
         //     if (isNaN(d)) return dateStr;
@@ -3568,20 +4041,20 @@
         // end JS packing plan
 
         //FILTER SORT
+        // 11 Newest entry, 12 Oldest entry, 13 Earliest closing due, 14 Earliest ECA, 15 Most container
         function sortlistByDate(value) {
             document.getElementById('sortlistByDate').value = value;
-            onSpSearch()
 
-            if (value == 11) {
-                $('#newest').removeClass('d-none');
-                $('#oldest').addClass('d-none');
-            } else if (value == 12) {
-                $('#newest').addClass('d-none');
-                $('#oldest').removeClass('d-none');
-            } else {
-                $('#newest').removeClass('d-none');
-                $('#oldest').addClass('d-none');
-            }
+            document.querySelectorAll('.sp-sort-item').forEach(function(item) {
+                const active = item.dataset.sort == value;
+                item.classList.toggle('active', active);
+                if (active) {
+                    document.getElementById('spSortLabel').textContent =
+                        item.querySelector('.sp-sort-title').textContent;
+                }
+            });
+
+            onSpSearch();
         }
         //END
 
@@ -3858,7 +4331,7 @@
         /*end*/
 
         function menu2() {
-            const rows = $('#dgShipmentPlan').datagrid('getChecked');
+            const rows = getCheckedShipPos();
             const count = rows.length;
 
             console.log('Checked rows:', rows);
@@ -3900,7 +4373,7 @@
         }
 
         function count_row2() {
-            var count = $('#dgShipmentPlan').datagrid('getChecked').length;
+            var count = getCheckedShipPos().length;
             if (count) {
                 $('#myHeader2').removeClass('d-none');
                 document.getElementById("count2").innerHTML = count + " items selected";
@@ -3918,7 +4391,7 @@
         function close_menu() {
             $('#myHeader2').addClass('d-none');
             $('#dgShipmentPlan').datagrid('clearSelections');
-            $('#dgShipmentPlan').datagrid('clearChecked');
+            clearShipPoChecks();
         }
 
         //JS untuk modal packing plan
@@ -3963,7 +4436,7 @@
                 return;
             }
 
-            var rows = dg.datagrid('getChecked');
+            var rows = getCheckedShipPos();
 
             if (!rows || rows.length === 0) {
                 $.messager.alert('Warning', 'Silakan pilih data terlebih dahulu.', 'warning');
@@ -4058,7 +4531,7 @@
                 return;
             }
 
-            var rows = dg.datagrid('getChecked');
+            var rows = getCheckedShipPos();
 
             if (!rows || rows.length === 0) {
                 $.messager.alert('Warning', 'Silakan pilih data terlebih dahulu.', 'warning');
@@ -5512,26 +5985,81 @@
             function ensureModal() {
                 if (document.getElementById('modalAddPo')) return;
                 document.body.insertAdjacentHTML('beforeend', `
+                    <style>
+                        #modalAddPo .apo-content { border: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 48px rgba(16,24,40,.18); }
+                        #modalAddPo .apo-header { display: flex; align-items: flex-start; gap: 14px; padding: 18px 22px 14px; border-bottom: 1px solid #EAECF0; }
+                        #modalAddPo .apo-header-icon { width: 42px; height: 42px; border-radius: 12px; background: #EAF2FF; color: #2F6FED; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+                        #modalAddPo .apo-title { margin: 0; font-size: 1.05rem; font-weight: 700; color: #101828; }
+                        #modalAddPo .apo-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+                        #modalAddPo .apo-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; font-size: .74rem; font-weight: 600; background: #F2F4F7; color: #344054; }
+                        #modalAddPo .apo-chip-id { background: #EAF2FF; color: #2F6FED; }
+                        #modalAddPo .apo-toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 22px; background: #FCFCFD; border-bottom: 1px solid #EAECF0; }
+                        #modalAddPo .apo-search { position: relative; flex: 1; }
+                        #modalAddPo .apo-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #98A2B3; }
+                        #modalAddPo .apo-search input { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid #D0D5DD; border-radius: 10px; font-size: .85rem; outline: none; transition: border-color .15s, box-shadow .15s; }
+                        #modalAddPo .apo-search input:focus { border-color: #84ADFF; box-shadow: 0 0 0 3px rgba(47,111,237,.12); }
+                        #modalAddPo .apo-total { font-size: .76rem; color: #667085; white-space: nowrap; }
+                        #modalAddPo .apo-body { padding: 0; max-height: 58vh; overflow: auto; }
+                        #modalAddPo .apo-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .84rem; }
+                        #modalAddPo .apo-table thead th { position: sticky; top: 0; z-index: 1; background: #F8F9FC; color: #667085; font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 9px 12px; border-bottom: 1px solid #EAECF0; white-space: nowrap; }
+                        #modalAddPo .apo-table tbody td { padding: 10px 12px; border-bottom: 1px solid #F2F4F7; vertical-align: middle; }
+                        #modalAddPo .apo-table tbody tr.apo-row { cursor: pointer; transition: background-color .12s; }
+                        #modalAddPo .apo-table tbody tr.apo-row:hover td { background: #F9FAFB; }
+                        #modalAddPo .apo-table tbody tr.apo-row.is-checked td { background: #F5F8FF; }
+                        #modalAddPo .apo-table tbody tr.apo-row.is-checked td:first-child { box-shadow: inset 3px 0 0 #2F6FED; }
+                        #modalAddPo .apo-po { font-weight: 700; color: #101828; }
+                        #modalAddPo .apo-op { font-size: .74rem; color: #667085; margin-top: 1px; }
+                        #modalAddPo .apo-muted { color: #98A2B3; }
+                        #modalAddPo .apo-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+                        #modalAddPo .apo-sp { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; margin: 1px 2px 1px 0; border-radius: 6px; background: #FFF6ED; color: #C4320A; font-size: .72rem; font-weight: 700; }
+                        #modalAddPo .apo-sp-current { background: #EAF2FF; color: #2F6FED; }
+                        #modalAddPo .apo-table tbody tr.apo-row-disabled { cursor: not-allowed; }
+                        #modalAddPo .apo-table tbody tr.apo-row-disabled td { background: #FCFCFD; color: #98A2B3; }
+                        #modalAddPo .apo-table tbody tr.apo-row-disabled .apo-po { color: #667085; }
+                        #modalAddPo .apo-nopack { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #F2F4F7; color: #667085; font-size: .7rem; font-weight: 600; }
+                        #modalAddPo .apo-state td { text-align: center; color: #667085; padding: 36px 12px !important; cursor: default; }
+                        #modalAddPo .apo-footer { display: flex; align-items: center; gap: 8px; padding: 12px 22px; border-top: 1px solid #EAECF0; background: #FCFCFD; }
+                        #modalAddPo .apo-count { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; background: #EAF2FF; color: #2F6FED; font-size: .78rem; font-weight: 700; }
+                        #modalAddPo .apo-error { margin: 12px 22px 0; }
+                    </style>
                     <div class="modal fade" id="modalAddPo" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                        <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Tambah PO ke <span id="apoIdship"></span></h5>
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content apo-content">
+                        <div class="apo-header">
+                            <div class="apo-header-icon"><i class="bi bi-plus-square"></i></div>
+                            <div class="flex-fill">
+                                <h5 class="apo-title">Tambah PO Number</h5>
+                                <div class="apo-meta">
+                                    <span class="apo-chip apo-chip-id"><i class="bi bi-hash"></i> <span id="apoIdship">-</span></span>
+                                    <span class="apo-chip"><i class="bi bi-person-badge"></i> Buyer: <span id="apoBuyer">-</span></span>
+                                </div>
+                            </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="modal-body">
-                            <input type="text" id="apoSearch" class="form-control form-control-sm mb-2" placeholder="Cari POno...">
-                            <div id="apoError" class="alert alert-danger py-2 d-none"></div>
-                            <table class="table table-sm table-hover align-middle mb-0">
+                        <div class="apo-toolbar">
+                            <div class="apo-search">
+                                <i class="bi bi-search"></i>
+                                <input type="text" id="apoSearch" placeholder="Cari PO Number / OP...">
+                            </div>
+                            <span class="apo-total" id="apoTotal"></span>
+                        </div>
+                        <div id="apoError" class="alert alert-danger py-2 apo-error d-none"></div>
+                        <div class="apo-body">
+                            <table class="apo-table">
                             <thead><tr>
-                                <th style="width:32px"><input type="checkbox" id="apoCheckAll"></th>
-                                <th>POno</th><th>OP</th><th>PO Ref</th><th class="text-end">Carton</th><th class="text-end">Qty</th>
+                                <th style="width:44px" class="text-center"><input type="checkbox" class="form-check-input" id="apoCheckAll"></th>
+                                <th>PO Number / OP</th>
+                                <th>PO Ref</th>
+                                <th>Buyer</th>
+                                <th>Shipment Plan</th>
+                                <th class="text-end">Carton</th>
+                                <th class="text-end">Qty (PCS)</th>
                             </tr></thead>
-                            <tbody id="apoBody"><tr><td colspan="6" class="text-center text-muted">Memuat...</td></tr></tbody>
+                            <tbody id="apoBody">${stateRow('<span class="spinner-border spinner-border-sm me-2"></span>Memuat...')}</tbody>
                             </table>
                         </div>
-                        <div class="modal-footer">
-                            <span class="me-auto small text-muted"><span id="apoCount">0</span> PO dipilih</span>
+                        <div class="apo-footer">
+                            <span class="apo-count"><i class="bi bi-check2-square"></i> <span id="apoCount">0</span> PO dipilih</span>
                             <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
                             <button type="button" class="btn btn-primary" id="btnSaveAddPo">
                             <span class="spinner-border spinner-border-sm d-none me-1" id="apoSpin"></span>Simpan
@@ -5547,16 +6075,40 @@
                     t = setTimeout(loadList, 300);
                 });
                 document.getElementById('apoCheckAll').addEventListener('change', function() {
-                    document.querySelectorAll('#apoBody .apo-chk').forEach(c => c.checked = this.checked);
+                    document.querySelectorAll('#apoBody .apo-chk:not(:disabled)').forEach(c => c.checked = this.checked);
                     updateCount();
                 });
                 document.getElementById('apoBody').addEventListener('change', updateCount);
+                // klik di mana saja pada baris -> toggle checkbox-nya
+                document.getElementById('apoBody').addEventListener('click', function(e) {
+                    const tr = e.target.closest('tr.apo-row');
+                    if (!tr || e.target.closest('input')) return;
+                    const chk = tr.querySelector('.apo-chk');
+                    if (chk.disabled) return;
+                    chk.checked = !chk.checked;
+                    updateCount();
+                });
                 document.getElementById('btnSaveAddPo').addEventListener('click', save);
             }
 
+            function stateRow(html, cls = '') {
+                return `<tr class="apo-state"><td colspan="7" class="${cls}">${html}</td></tr>`;
+            }
+
+            function setHeader(idship, buyer) {
+                if (idship) document.getElementById('apoIdship').textContent = idship;
+                if (buyer) document.getElementById('apoBuyer').textContent = String(buyer).trim();
+            }
+
             function updateCount() {
-                document.getElementById('apoCount').textContent =
-                    document.querySelectorAll('#apoBody .apo-chk:checked').length;
+                const boxes = document.querySelectorAll('#apoBody .apo-chk:not(:disabled)');
+                let checked = 0;
+                boxes.forEach(c => {
+                    c.closest('tr').classList.toggle('is-checked', c.checked);
+                    if (c.checked) checked++;
+                });
+                document.getElementById('apoCount').textContent = checked;
+                document.getElementById('apoCheckAll').checked = boxes.length > 0 && checked === boxes.length;
             }
 
             function esc(s) {
@@ -5571,7 +6123,8 @@
 
             async function loadList() {
                 const body = document.getElementById('apoBody');
-                body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Memuat...</td></tr>';
+                body.innerHTML = stateRow('<span class="spinner-border spinner-border-sm me-2"></span>Memuat...');
+                document.getElementById('apoTotal').textContent = '';
                 const q = encodeURIComponent(document.getElementById('apoSearch').value.trim());
                 try {
                     const urlTpl = '{{ route('export.available-po', ['exportpk' => '__ID__']) }}';
@@ -5582,25 +6135,48 @@
                         }
                     });
                     const json = await res.json();
-                    const rows = json.data || [];
-                    if (!rows.length) {
-                        body.innerHTML =
-                            '<tr><td colspan="6" class="text-center text-muted">Tidak ada PO yang tersedia.</td></tr>';
+                    setHeader(json.idship, json.buyer);
+
+                    if (json.success === false) {
+                        body.innerHTML = stateRow(esc(json.message || 'Gagal memuat data.'), 'text-danger');
                         return;
                     }
-                    body.innerHTML = rows.map((r, i) => `
-                    <tr>
-                    <td><input type="checkbox" class="apo-chk" data-i="${i}"></td>
-                    <td>${esc(r.POno)}</td><td>${esc(r.OP)}</td><td>${esc(r.poref)}</td>
-                    <td class="text-end">${r.ctn > 0 ? r.ctn : '<span class="badge bg-secondary">belum ada pack</span>'}</td>
-                    <td class="text-end">${r.ctn > 0 ? Number(r.qty || 0).toLocaleString('id-ID') : '-'}</td>
-                    </tr>`).join('');
+
+                    const rows = json.data || [];
+                    document.getElementById('apoTotal').textContent = rows.length + ' PO tersedia';
+                    if (!rows.length) {
+                        body.innerHTML = stateRow('<i class="bi bi-inbox me-1"></i> Tidak ada PO yang tersedia.');
+                        return;
+                    }
+                    const currentId = 'SP' + String(apoExportpk).padStart(4, '0');
+                    body.innerHTML = rows.map((r, i) => {
+                        const sps = Array.isArray(r.shipplans) ? r.shipplans : [];
+                        const spHtml = sps.length ?
+                            sps.map(sp => sp === currentId ?
+                                `<span class="apo-sp apo-sp-current" title="PO ini sudah ada di shipment plan ini"><i class="bi bi-check2-circle"></i>${esc(sp)} (ini)</span>` :
+                                `<span class="apo-sp" title="PO ini sudah ada di shipment plan ${esc(sp)} (partial)"><i class="bi bi-box-seam"></i>${esc(sp)}</span>`
+                            ).join('') :
+                            '<span class="apo-muted">-</span>';
+                        const hasPack = r.ctn > 0;
+                        const inThis = !!r.in_this;
+                        return `
+                        <tr class="apo-row ${inThis ? 'apo-row-disabled' : ''}" ${inThis ? 'title="Sudah ada di shipment plan ini"' : ''}>
+                            <td class="text-center"><input type="checkbox" class="form-check-input apo-chk" data-i="${i}" ${inThis ? 'disabled' : ''}></td>
+                            <td>
+                                <div class="apo-po">${esc(r.POno)}</div>
+                                <div class="apo-op">OP ${esc(r.OP || '-')}</div>
+                            </td>
+                            <td>${r.poref && r.poref !== '-' ? esc(r.poref) : '<span class="apo-muted">-</span>'}</td>
+                            <td>${esc(r.buyer || '-')}</td>
+                            <td>${spHtml}</td>
+                            <td class="apo-num">${hasPack ? Number(r.ctn).toLocaleString('id-ID') : '<span class="apo-nopack">belum ada pack</span>'}</td>
+                            <td class="apo-num">${hasPack ? Number(r.qty || 0).toLocaleString('id-ID') : '<span class="apo-muted">-</span>'}</td>
+                        </tr>`;
+                    }).join('');
                     body._rows = rows;
-                    document.getElementById('apoCheckAll').checked = false;
                     updateCount();
                 } catch (e) {
-                    body.innerHTML =
-                        '<tr><td colspan="6" class="text-center text-danger">Gagal memuat data.</td></tr>';
+                    body.innerHTML = stateRow('Gagal memuat data.', 'text-danger');
                 }
             }
 
@@ -5641,13 +6217,9 @@
                         })
                     });
                     const json = await res.json();
-                    if (json.buyer) {
-                        document.getElementById('apoIdship').textContent =
-                            'SP' + String(apoExportpk).padStart(4, '0') + ' (' + json.buyer + ')';
-                    }
+                    setHeader(null, json.buyer);
                     if (json.success === false) {
-                        body.innerHTML = '<tr><td colspan="6" class="text-center text-danger">' + esc(json
-                            .message) + '</td></tr>';
+                        body.innerHTML = stateRow(esc(json.message), 'text-danger');
                         return;
                     }
                     if (!res.ok || !json.success) {
@@ -5671,8 +6243,9 @@
             window.add_po = function(exportpk, buyer) {
                 ensureModal();
                 apoExportpk = exportpk;
-                document.getElementById('apoIdship').textContent = 'SP' + String(exportpk).padStart(4, '0') + ' (' + buyer + ')';
+                setHeader('SP' + String(exportpk).padStart(4, '0'), buyer || '-');
                 document.getElementById('apoSearch').value = '';
+                document.getElementById('apoCount').textContent = '0';
                 document.getElementById('apoError').classList.add('d-none');
                 const el = document.getElementById('modalAddPo');
                 (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
@@ -5734,7 +6307,7 @@
 
                 {{-- ================= TOOLBAR ================= --}}
                 <div class="sp-toolbar align-items-center justify-content-between">
-                    <div class="d-flex">
+                    <div class="sp-filters">
                         <div class="sp-search-box">
                             <i class="bi bi-search"></i>
                             <input type="text" id="spSearch" placeholder="Cari ID Shipplan / Order No / PO / Peb No / vessname..."
@@ -5743,7 +6316,7 @@
 
                         <div class="ps-2">
                             <input class="easyui-combobox sp-filter-select-cbb ps-2" name="spFilterBuyer" id="spFilterBuyer"
-                                style="width:175px;"
+                                style="width:150px;"
                                 data-options="
                                 valueField:'byrnm',
                                 textField:'byrnm',
@@ -5758,7 +6331,7 @@
 
                         <div class="ps-2">
                             <input class="easyui-combobox sp-filter-select-cbb" name="spFilterVassal" id="spFilterVassal"
-                                style="width:150px;"
+                                style="width:135px;"
                                 data-options="
                                 valueField:'vassalpk',
                                 textField:'typenm',
@@ -5774,12 +6347,19 @@
                         <div class="ps-2">
                             <input id="filterday" name="filterday" class="easyui-combobox sp-filter-select-cbb"
                                 editable="false" singleSelect="true"
-                                data-options="valueField:'value', textField:'text', url:'{{ route('filterday') }}', prompt:'Ex-Factory', panelHeight:'auto', onChange:onSpSearch"
-                                method="get" style="width:150px;">
+                                data-options="valueField:'value', textField:'text', url:'{{ route('filterday') }}', prompt:'Buyer Ex-Factory', panelHeight:'auto', onChange:onSpSearch"
+                                method="get" style="width:125px;">
+                        </div>
+                        <div class="ps-2">
+                            {{-- filter kolom ECA (export.contdate), pilihan rentang sama dengan Ex-Factory --}}
+                            <input id="filterdayEca" name="filterdayEca" class="easyui-combobox sp-filter-select-cbb"
+                                editable="false" singleSelect="true"
+                                data-options="valueField:'value', textField:'text', url:'{{ route('filterday') }}', prompt:'ECA', panelHeight:'auto', onChange:onSpSearch"
+                                method="get" style="width:125px;">
                         </div>
                         <div class="ps-2">
                             <select class="easyui-combobox sp-filter-select-cbb" name="spFilterStatus" id="spFilterStatus"
-                                style="width:150px;"
+                                style="width:125px;"
                                 data-options="
                                 prompt:'Status',
                                 panelHeight:'auto',
@@ -5807,30 +6387,46 @@
                         </div>
                     </div>
 
-                    <div class="pe-2">
-                        <!-- SORT FILTER -->
-                        <div id="sortlist-grup" class="p-1 pt-4 pb-0 responsive">
-                            <div class="btn-group">
-                                <input type="hidden" id="sortlistByDate" name="sortlistByDate" size="5" readonly>
-                                <div class="btn-group">
-                                    <button class="btn btn-sortlist dropdown-toggle-custom-sortlist pt-0"
-                                        data-bs-toggle="dropdown" data-bs-target="#menu-sortlist" aria-expanded="true">
-                                        <img src="{{ asset('public/css/images/sort.png') }}" alt=""
-                                            class="imgsort">
-                                        <span id="newest">Newest Entry</span>
-                                        <span id="oldest" class="d-none">Oldest Entry</span>
-                                    </button>
-                                    <ul id="menu-sortlist"
-                                        class="dropdown-menu dropdown-menu-end dropdown-menu-custom-global dropdown-menu-sortlist pt-0 pb-0">
-                                        <li><a class="dropdown-item dropdown-item-custom-global dropdown-item-custom-global-start p-2"
-                                                onclick="sortlistByDate(11)">Newest Entry</a></li>
-                                        <!-- <li><hr class="dropdown-divider mt-0 mb-0"></li> -->
-                                        <li><a class="dropdown-item dropdown-item-custom-global dropdown-item-custom-global-end p-2"
-                                                onclick="sortlistByDate(12)">Oldest Entry</a></li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- SORT -->
+                    <div class="sp-sort dropdown">
+                        <input type="hidden" id="sortlistByDate" name="sortlistByDate" value="11" readonly>
+                        <button type="button" class="sp-sort-btn" data-bs-toggle="dropdown" data-bs-offset="0,8"
+                            aria-expanded="false">
+                            <i class="bi bi-arrow-down-up"></i>
+                            <span id="spSortLabel">Newest entry</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end sp-sort-menu">
+                            <li>
+                                <a class="sp-sort-item active" href="javascript:void(0)" data-sort="11" onclick="sortlistByDate(11)">
+                                    <span class="sp-sort-title">Newest entry</span>
+                                    <span class="sp-sort-desc">Shipment plans created most recently first</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="sp-sort-item" href="javascript:void(0)" data-sort="12" onclick="sortlistByDate(12)">
+                                    <span class="sp-sort-title">Oldest entry</span>
+                                    <span class="sp-sort-desc">Shipment plans created earliest first</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="sp-sort-item" href="javascript:void(0)" data-sort="13" onclick="sortlistByDate(13)">
+                                    <span class="sp-sort-title">Earliest closing due</span>
+                                    <span class="sp-sort-desc">Earliest container closing across the PO's plans</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="sp-sort-item" href="javascript:void(0)" data-sort="14" onclick="sortlistByDate(14)">
+                                    <span class="sp-sort-title">Earliest ECA</span>
+                                    <span class="sp-sort-desc">Earliest container arrival date across the plan</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="sp-sort-item" href="javascript:void(0)" data-sort="15" onclick="sortlistByDate(15)">
+                                    <span class="sp-sort-title">Most container</span>
+                                    <span class="sp-sort-desc">Plans with the most containers first</span>
+                                </a>
+                            </li>
+                        </ul>
                     </div>
                 </div>
 

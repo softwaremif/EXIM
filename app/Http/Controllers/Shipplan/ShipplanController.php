@@ -74,6 +74,85 @@ class ShipplanController extends Controller
         ]);
     }
 
+    // ============================================================
+    // LIST SHIPMENT PLAN - 1 baris per shipment (exportpk), daftar
+    // OP/PO-nya dikirim di 'pos' untuk ditampilkan saat baris di-expand.
+    // Paging dihitung per shipment supaya 1 shipment tidak terpotong
+    // di 2 halaman. Filter & enrichment sama dengan getListExport.
+    // ============================================================
+    public function getListExportGrouped(Request $request)
+    {
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, (int) $request->input('rows', 100));
+        $offset = ($page - 1) * $perPage;
+
+        $userpk = Session::get('userpk');
+        $guserpk = Session::get('guserpk');
+
+        $query = $this->applyExportFilters($this->baseExportQuery(), $request, $userpk, $guserpk);
+
+        $exportQuery = DB::query()
+            ->fromSub(clone $query, 'sub')
+            ->select(
+                'sub.exportpk',
+                DB::raw('MAX(sub.datecreate) as datecreate'),
+                DB::raw('MIN(sub.closetime) as closetime'),
+                DB::raw('MIN(sub.contdate) as contdate')
+            )
+            ->whereNotNull('sub.exportpk')
+            ->groupBy('sub.exportpk');
+
+        $total = DB::query()->fromSub(clone $exportQuery, 'exp')->count();
+
+        $this->applyExportSort($exportQuery, $request->input('sortlistByDate'), 'sub.exportpk', 'datecreate', 'closetime', 'contdate');
+
+        $exportpks = $exportQuery
+            ->orderBy('sub.exportpk', 'desc')
+            ->limit($perPage)
+            ->offset($offset)
+            ->pluck('exportpk');
+
+        if ($exportpks->isEmpty()) {
+            return response()->json(['total' => $total, 'rows' => []]);
+        }
+
+        $result = (clone $query)
+            ->whereIn('export.exportpk', $exportpks->all())
+            ->orderBy('poexport.poexportpk')
+            ->get();
+
+        $result = $this->enrichExportRows($result);
+        $result = $this->enrichPoCount($result);
+
+        $this->addOrderImageToRows($result);
+        $this->addUsernameToRows($result);
+
+        $byExport = $result->groupBy('exportpk');
+
+        $rows = $exportpks->values()->map(function ($exportpk, $index) use ($byExport, $offset) {
+            $pos = $byExport->get($exportpk, collect())->values();
+            $first = $pos->first();
+
+            $row = clone $first;
+            $row->no = $offset + $index + 1;
+            $row->qty = $pos->sum(fn($p) => (float) $p->qty);
+            $row->po_count = $pos->count();
+            $row->ops = $pos->pluck('OP')->filter()->unique()->values()->all();
+            $row->ponos = $pos->pluck('POno')->filter()->unique()->values()->all();
+            $row->mif = $pos->pluck('mif')
+                ->flatMap(fn($m) => explode(' & ', (string) $m))
+                ->filter()->unique()->sort()->implode(' & ') ?: 'MIF 2';
+            $row->pos = $pos->all();
+
+            return $row;
+        });
+
+        return response()->json([
+            'total' => $total,
+            'rows' => $rows,
+        ]);
+    }
+
     // private function addOrderImageToRows($rows): void
     // {
     //     if ($rows->isEmpty()) {
@@ -698,13 +777,58 @@ class ShipplanController extends Controller
     function filterday()
     {
         $data = [
+            ['value' => '0', 'text' => 'All Time'],
             ['value' => '1', 'text' => 'Hari ini'],
             ['value' => '2', 'text' => 'Minggu ini'],
-            ['value' => '3', 'text' => 'Bulan ini'],
-            ['value' => '4', 'text' => '3 Bulan depan'],
-            ['value' => '5', 'text' => 'Tahun ini'],
+            ['value' => '3', 'text' => 'Minggu depan'],
+            ['value' => '4', 'text' => '2 Minggu depan'],
+            ['value' => '5', 'text' => 'Bulan kemarin'],
+            ['value' => '6', 'text' => 'Bulan ini'],
+            ['value' => '7', 'text' => 'Bulan depan'],
+            ['value' => '8', 'text' => '3 Bulan depan'],
+            ['value' => '9', 'text' => '6 Bulan depan'],
+            ['value' => '10', 'text' => 'Tahun ini'],
         ];
         return response()->json($data);
+    }
+
+    // Rentang tanggal untuk tiap value filterday(); null = tanpa filter (All Time)
+    private function dayRange($value): ?array
+    {
+        $today = Carbon::today();
+
+        switch ((int) $value) {
+            case 1: // Hari ini
+                return [$today->copy(), $today->copy()->endOfDay()];
+            case 2: // Minggu ini
+                return [$today->copy()->startOfWeek(), $today->copy()->endOfWeek()];
+            case 3: // Minggu depan
+                return [$today->copy()->addWeek()->startOfWeek(), $today->copy()->addWeek()->endOfWeek()];
+            case 4: // 2 Minggu depan (hari ini s/d 2 minggu ke depan)
+                return [$today->copy(), $today->copy()->addWeeks(2)->endOfDay()];
+            case 5: // Bulan kemarin
+                return [$today->copy()->subMonthNoOverflow()->startOfMonth(), $today->copy()->subMonthNoOverflow()->endOfMonth()];
+            case 6: // Bulan ini
+                return [$today->copy()->startOfMonth(), $today->copy()->endOfMonth()];
+            case 7: // Bulan depan
+                return [$today->copy()->addMonthNoOverflow()->startOfMonth(), $today->copy()->addMonthNoOverflow()->endOfMonth()];
+            case 8: // 3 Bulan depan (hari ini s/d 3 bulan ke depan)
+                return [$today->copy(), $today->copy()->addMonthsNoOverflow(3)->endOfDay()];
+            case 9: // 6 Bulan depan (hari ini s/d 6 bulan ke depan)
+                return [$today->copy(), $today->copy()->addMonthsNoOverflow(6)->endOfDay()];
+            case 10: // Tahun ini
+                return [$today->copy()->startOfYear(), $today->copy()->endOfYear()];
+            default: // 0 / kosong = All Time
+                return null;
+        }
+    }
+
+    private function applyDayRangeFilter($query, string $column, $value): void
+    {
+        $range = $this->dayRange($value);
+        if ($range) {
+            $query->whereBetween($column, [$range[0]->toDateTimeString(), $range[1]->toDateTimeString()]);
+        }
     }
 
     /**
@@ -2017,6 +2141,7 @@ class ShipplanController extends Controller
                 // 'export.actexdate', // dibutuhkan buat hitung status_label
                 'export.GAC',
                 'export.contdate',
+                'export.closetime',
                 'export.totctn',
                 'export.qty_list',
                 'export.userpk',
@@ -2131,43 +2256,41 @@ class ShipplanController extends Controller
             $query->where('export.stscancel', 1);
         }
 
-        if (!empty($searchByRangeDay)) {
-            switch ((int) $searchByRangeDay) {
-                case 1:
-                    $query->whereDate('export.exdate', Carbon::today());
-                    break;
+        // filter Ex-Factory -> kolom Buyer Ex-Factory (export.GAC)
+        $this->applyDayRangeFilter($query, 'export.GAC', $searchByRangeDay);
 
-                case 2:
-                    $query->whereBetween('export.exdate', [
-                        Carbon::now()->startOfWeek(),
-                        Carbon::now()->endOfWeek()
-                    ]);
-                    break;
+        // filter ECA -> kolom ECA / Estimasi Container Arrival (export.contdate)
+        $this->applyDayRangeFilter($query, 'export.contdate', $request->input('searchByRangeEca'));
 
-                case 3:
-                    $query->whereMonth('export.exdate', Carbon::now()->month)
-                        ->whereYear('export.exdate', Carbon::now()->year);
-                    break;
-
-                case 4:
-                    $query->whereBetween('export.exdate', [
-                        Carbon::today(),
-                        Carbon::today()->addMonths(3)
-                    ]);
-                    break;
-
-                case 5:
-                    $query->whereYear('export.exdate', Carbon::now()->year);
-                    break;
-            }
-        }
-
-        $query->orderBy(
-            'export.datecreate',
-            $sortlistByDate == 12 ? 'asc' : 'desc'
-        );
+        $this->applyExportSort($query, $sortlistByDate, 'export.exportpk', 'export.datecreate', 'export.closetime', 'export.contdate');
 
         return $query;
+    }
+
+    // Urutan list shipment plan (nilai sortlistByDate):
+    // 11 Newest Entry (default), 12 Oldest Entry, 13 Earliest Closing Due,
+    // 14 Earliest ECA, 15 Most Container. Tanggal kosong selalu ditaruh di akhir.
+    private function applyExportSort($query, $sort, string $exportpkCol, string $datecreateCol, string $closetimeCol, string $contdateCol): void
+    {
+        switch ((int) $sort) {
+            case 12:
+                $query->orderBy($datecreateCol, 'asc');
+                break;
+            case 13:
+                $query->orderByRaw("{$closetimeCol} IS NULL")->orderBy($closetimeCol, 'asc')
+                    ->orderBy($datecreateCol, 'desc');
+                break;
+            case 14:
+                $query->orderByRaw("{$contdateCol} IS NULL")->orderBy($contdateCol, 'asc')
+                    ->orderBy($datecreateCol, 'desc');
+                break;
+            case 15:
+                $query->orderByRaw("(SELECT COUNT(*) FROM cont c WHERE c.exportpk = {$exportpkCol}) DESC")
+                    ->orderBy($datecreateCol, 'desc');
+                break;
+            default:
+                $query->orderBy($datecreateCol, 'desc');
+        }
     }
 
     // ============================================================
@@ -3217,7 +3340,7 @@ class ShipplanController extends Controller
             ->whereNull('p.exportpk')
             ->where('po.' . self::PACK_BUYER_COL, $buyer)
             ->groupBy('p.POno', 'p.OP', 'po.poref')
-            ->selectRaw('p.POno, p.OP, po.poref, COUNT(*) as ctn, SUM(p.pcsp) as qty')
+            ->selectRaw('p.POno, p.OP, po.poref, MAX(po.' . self::PO_BUYER_COL . ') as buyer, COUNT(*) as ctn, SUM(p.pcsp) as qty')
             ->orderBy('p.OP', 'DESC')
             ->limit(300);
 
@@ -3228,7 +3351,7 @@ class ShipplanController extends Controller
                 $q->select(DB::raw(1))->from('pack')->whereRaw('pack.popk = po.popk');
             })
             ->groupBy('po.POno', 'po.OP', 'po.poref')
-            ->selectRaw('po.POno, po.OP, po.poref, 0 as ctn, 0 as qty')
+            ->selectRaw('po.POno, po.OP, po.poref, MAX(po.' . self::PO_BUYER_COL . ') as buyer, 0 as ctn, 0 as qty')
             ->orderBy('po.OP', 'DESC')
             ->limit(300);
 
@@ -3251,13 +3374,44 @@ class ShipplanController extends Controller
         foreach ([$qa->get(), $qb->get()] as $set) {      // A dulu, B hanya yang belum muncul di A
             foreach ($set as $r) {
                 $key = $r->POno . '|' . $r->OP;
-                if (isset($existing[$key]) || isset($seen[$key])) continue;
+                if (isset($seen[$key])) continue;
                 $seen[$key] = true;
+                // PO yang sudah ada di shipment ini tetap ditampilkan sebagai penanda
+                // (tidak bisa dipilih lagi), PO di shipment lain tetap bisa dipilih (partial)
+                $r->in_this = isset($existing[$key]);
                 $rows[] = $r;
             }
         }
 
-        return response()->json(['success' => true, 'buyer' => $buyer, 'data' => $rows]);
+        // ID shipment plan lain yang sudah memuat PO ini (mis. partial shipment),
+        // shipment yang sudah di-cancel tidak dihitung
+        $shipplanMap = [];
+        $ponos = collect($rows)->pluck('POno')->filter()->unique()->values();
+        if ($ponos->isNotEmpty()) {
+            DB::table('poexport')
+                ->join('export', 'export.exportpk', '=', 'poexport.exportpk')
+                ->whereIn('poexport.POno', $ponos->all())
+                ->where(function ($q) {
+                    $q->whereNull('export.stscancel')->orWhere('export.stscancel', '<>', 1);
+                })
+                ->orderBy('poexport.exportpk')
+                ->get(['poexport.POno', 'poexport.OP', 'poexport.exportpk'])
+                ->each(function ($r) use (&$shipplanMap) {
+                    $shipplanMap[$r->POno . '|' . $r->OP][] = 'SP' . str_pad($r->exportpk, 4, '0', STR_PAD_LEFT);
+                });
+        }
+
+        foreach ($rows as $r) {
+            $r->buyer = trim((string) $r->buyer) ?: $buyer;
+            $r->shipplans = array_values(array_unique($shipplanMap[$r->POno . '|' . $r->OP] ?? []));
+        }
+
+        return response()->json([
+            'success' => true,
+            'buyer'   => $buyer,
+            'idship'  => 'SP' . str_pad($export->exportpk, 4, '0', STR_PAD_LEFT),
+            'data'    => $rows,
+        ]);
     }
 
     /**

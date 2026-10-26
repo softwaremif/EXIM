@@ -164,6 +164,7 @@ Route::post('cancelinvs', [InvoiceController::class, 'cancelinvs'])->name('cance
 
     /*ship plan*/
     Route::get('/getListExport', [ShipplanController::class, 'getListExport'])->name('shipplan.getListExport');
+    Route::get('/getListExportGrouped', [ShipplanController::class, 'getListExportGrouped'])->name('shipplan.getListExportGrouped');
     Route::post('/removeList', [ShipplanController::class, 'removeList'])->name('shipplan.removeList');
     Route::post('/exim-export/set_shipplan', [ShipplanController::class, 'set_shipplan'])->name('set_shipplan');
     Route::post('/exim-export/set_invs', [ShipplanController::class, 'set_invs'])->name('set_invs');
