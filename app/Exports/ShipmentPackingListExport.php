@@ -17,6 +17,7 @@ class ShipmentPackingListExport implements FromView, WithStyles
     protected $sizes = []; // label size (gabungan semua PO), dipakai juga di WithStyles
     protected $rowCount = 0;
     protected $bundleRanges = []; // [index line awal, index line akhir] tiap carton bundle
+    protected $ratioRanges = [];  // [index line awal, index line akhir] tiap blok carton ratio
 
     public function __construct($exportpk)
     {
@@ -64,9 +65,13 @@ class ShipmentPackingListExport implements FromView, WithStyles
         $this->sizes = $sizes;
         $this->rowCount = count($lines);
         $this->bundleRanges = [];
+        $this->ratioRanges = [];
         foreach ($lines as $idx => $line) {
             if (!empty($line['bundle']['first'])) {
                 $this->bundleRanges[] = [$idx, $idx + $line['bundle']['span'] - 1];
+            }
+            if (!empty($line['ratio'])) {
+                $this->ratioRanges[] = [$idx, $idx + $line['ratio']['span'] - 1];
             }
         }
 
@@ -76,7 +81,7 @@ class ShipmentPackingListExport implements FromView, WithStyles
     public function styles(Worksheet $sheet)
     {
         $sizeCount = count($this->sizes);
-        $lastColIndex = 8 + $sizeCount + 9; // A..H (8 kolom) + size + 9 kolom akhir
+        $lastColIndex = 9 + $sizeCount + 9; // A..I (9 kolom, s/d INSEAM) + size + 9 kolom akhir
         $lastCol = Coordinate::stringFromColumnIndex($lastColIndex);
         $headerRow = 1;
         $firstData = 2;
@@ -120,19 +125,19 @@ class ShipmentPackingListExport implements FromView, WithStyles
             ->getNumberFormat()->setFormatCode('0.00');
 
         // lebar kolom
-        $widths = [16, 16, 14, 22, 9, 7, 7, 10];
+        $widths = [16, 16, 14, 22, 9, 7, 7, 10, 9];
         foreach ($widths as $i => $w) {
             $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i + 1))->setWidth($w);
         }
         for ($i = 1; $i <= $sizeCount; $i++) {
-            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex(8 + $i))->setWidth(6);
+            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex(9 + $i))->setWidth(6);
         }
         foreach ([9, 9, 9, 12, 11, 11, 11, 11, 15] as $i => $w) {
-            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex(8 + $sizeCount + $i + 1))->setWidth($w);
+            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex(9 + $sizeCount + $i + 1))->setWidth($w);
         }
 
         // carton bundle: baris inner box diblok kuning, TTL CTN & Master Box di-merge (dihitung 1 carton)
-        $masterCol = Coordinate::stringFromColumnIndex(8 + $sizeCount + 1);
+        $masterCol = Coordinate::stringFromColumnIndex(9 + $sizeCount + 1);
         foreach ($this->bundleRanges as [$start, $end]) {
             $rowStart = $firstData + $start;
             $rowEnd = $firstData + $end;
@@ -145,6 +150,19 @@ class ShipmentPackingListExport implements FromView, WithStyles
                     $sheet->mergeCells("{$col}{$rowStart}:{$col}{$rowEnd}");
                 }
                 $sheet->getStyle("{$col}{$rowStart}:{$col}{$rowEnd}")->getAlignment()
+                    ->setVertical(Alignment::VERTICAL_CENTER);
+            }
+        }
+
+        // carton ratio: CTN NO., TTL CTN & TTL QTY di-merge per blok
+        $ttlQtyCol = Coordinate::stringFromColumnIndex(9 + $sizeCount + 3);
+        foreach ($this->ratioRanges as [$start, $end]) {
+            $rowStart = $firstData + $start;
+            $rowEnd = $firstData + $end;
+
+            foreach (['F', 'G', 'H', $ttlQtyCol] as $col) {
+                $sheet->mergeCells("{$col}{$rowStart}:{$col}{$rowEnd}");
+                $sheet->getStyle("{$col}{$rowStart}")->getAlignment()
                     ->setVertical(Alignment::VERTICAL_CENTER);
             }
         }
@@ -197,57 +215,88 @@ class ShipmentPackingListExport implements FromView, WithStyles
         return $fmt($packRow->panjang) . ' x ' . $fmt($packRow->lebar) . ' x ' . $fmt($packRow->tinggi);
     }
 
-    // carton berurutan dengan PO, style, color, isi, berat & ukuran yang sama
-    // digabung jadi 1 baris (CTN NO. dari - sampai)
+    // inseam dari pack.secsz ("INS 32" -> "32"); "-" / kosong berarti tanpa inseam
+    private function inseam($packRow): string
+    {
+        $v = trim((string) ($packRow->secsz ?? ''));
+        return $v === '-' ? '' : trim(preg_replace('/^INS\.?\s*/i', '', $v));
+    }
+
+    // carton biasa / ratio: 1 carton fisik = semua baris pack dengan PO + OP + no carton sama
+    // (carton ratio berisi beberapa baris, mis. per inseam). Carton berurutan dengan isi
+    // yang sama digabung jadi 1 blok (CTN NO. dari - sampai); tiap baris pack tetap 1 baris
+    // excel, CTN NO., TTL CTN & TTL QTY di-merge per blok.
     private function groupConsecutiveCartons($rows): array
     {
-        $lines = [];
-        $count = $rows->count();
-        $i = 0;
+        $cartons = [];
+        foreach ($rows as $r) {
+            $cartons[$r->POno . '|' . $r->OP . '|' . $r->carton][] = $r;
+        }
 
-        $signature = fn($r) => json_encode([
-            $r->POno, $r->style, $r->po_material, (int) $r->pcsp,
+        $rowSig = fn($r) => json_encode([
+            $r->POno, $r->style, $r->po_material, $this->inseam($r), (int) $r->pcsp,
             $this->extractQtyPerSize($r), (float) $r->gw, (float) $r->nw, $this->measurement($r),
         ]);
+        // isi carton dibandingkan tanpa melihat urutan baris di dalamnya
+        $cartonSig = function ($members) use ($rowSig) {
+            $sigs = array_map($rowSig, $members);
+            sort($sigs);
+            return implode("\n", $sigs);
+        };
+
+        $cartons = array_values($cartons);
+        $count = count($cartons);
+        $lines = [];
+        $i = 0;
 
         while ($i < $count) {
-            $current = $rows[$i];
-            $sig = $signature($current);
+            $members = $cartons[$i];
+            $sig = $cartonSig($members);
 
             $j = $i;
             while (
                 $j + 1 < $count
-                && (int) $rows[$j + 1]->carton === (int) $rows[$j]->carton + 1
-                && $signature($rows[$j + 1]) === $sig
+                && (int) $cartons[$j + 1][0]->carton === (int) $cartons[$j][0]->carton + 1
+                && $cartonSig($cartons[$j + 1]) === $sig
             ) {
                 $j++;
             }
 
             $ttlCtn = $j - $i + 1;
-            $gw = (float) ($current->gw ?? 0);
-            $nw = (float) ($current->nw ?? 0);
+            $span = count($members);
+            $qtyPerCarton = array_sum(array_map(fn($r) => (int) $r->pcsp, $members));
 
-            $lines[] = [
-                'POno'         => $current->POno,
-                'customer_po'  => '',
-                'style'        => $current->style,
-                'color'        => $current->po_material ?: $current->material,
-                'unit'         => '',
-                'ctn_from'     => $current->carton,
-                'ctn_to'       => $rows[$j]->carton,
-                'ttl_ctn'      => $ttlCtn,
-                'qty_per_size' => $this->extractQtyPerSize($current),
-                'qty_per_ctn'  => (int) $current->pcsp,
-                'ttl_qty'      => (int) $current->pcsp * $ttlCtn,
-                'gw'           => $gw,
-                'nw'           => $nw,
-                'ttl_gw'       => $gw * $ttlCtn,
-                'ttl_nw'       => $nw * $ttlCtn,
-                'meas'         => $this->measurement($current),
-                'master_box'   => '',
-                'remark'       => '',
-                'bundle'       => null,
-            ];
+            foreach ($members as $idx => $r) {
+                $first = $idx === 0;
+                $gw = (float) ($r->gw ?? 0);
+                $nw = (float) ($r->nw ?? 0);
+
+                $lines[] = [
+                    'POno'          => $r->POno,
+                    'customer_po'   => '',
+                    'style'         => $r->style,
+                    'color'         => $r->po_material ?: $r->material,
+                    'unit'          => '',
+                    'ctn_from'      => $first ? $members[0]->carton : '',
+                    'ctn_to'        => $first ? $cartons[$j][0]->carton : '',
+                    'ttl_ctn'       => $first ? $ttlCtn : 0,
+                    'ttl_ctn_label' => $first ? $ttlCtn : '',
+                    'inseam'        => $this->inseam($r),
+                    'qty_per_size'  => $this->extractQtyPerSize($r),
+                    'qty_per_ctn'   => (int) $r->pcsp,
+                    'ttl_qty'       => $first ? $qtyPerCarton * $ttlCtn : 0,
+                    'ttl_qty_label' => $first ? $qtyPerCarton * $ttlCtn : '',
+                    'gw'            => $gw,
+                    'nw'            => $nw,
+                    'ttl_gw'        => $gw * $ttlCtn,
+                    'ttl_nw'        => $nw * $ttlCtn,
+                    'meas'          => $this->measurement($r),
+                    'master_box'    => '',
+                    'remark'        => '',
+                    'bundle'        => null,
+                    'ratio'         => $span > 1 && $first ? ['span' => $span] : null,
+                ];
+            }
 
             $i = $j + 1;
         }
@@ -317,6 +366,7 @@ class ShipmentPackingListExport implements FromView, WithStyles
             'ctn_from'     => $r->carton,
             'ctn_to'       => $r->carton,
             'ttl_ctn'      => $ttlCtn,
+            'inseam'       => $this->inseam($r),
             'qty_per_size' => $this->extractQtyPerSize($r),
             'qty_per_ctn'  => (int) $r->pcsp,
             'ttl_qty'      => (int) $r->pcsp,
