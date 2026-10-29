@@ -8,6 +8,7 @@
             <th>UNIT</th>
             <th colspan="2">CTN NO.</th>
             <th>TTL CTN</th>
+            <th>INSEAM</th>
             @foreach ($sizes as $label)
                 <th>{{ $label }}</th>
             @endforeach
@@ -33,12 +34,13 @@
                 <td>{{ $line['ctn_from'] }}</td>
                 <td>{{ $line['ctn_to'] }}</td>
                 <td>{{ $line['ttl_ctn_label'] ?? $line['ttl_ctn'] }}</td>
+                <td>{{ $line['inseam'] }}</td>
                 @foreach ($sizes as $label)
                     <td>{{ $line['qty_per_size'][$label] ?? '' }}</td>
                 @endforeach
                 <td>{{ $line['master_box'] }}</td>
                 <td>{{ $line['qty_per_ctn'] }}</td>
-                <td>{{ $line['ttl_qty'] }}</td>
+                <td>{{ $line['ttl_qty_label'] ?? $line['ttl_qty'] }}</td>
                 <td>{{ $line['remark'] }}</td>
                 <td>{{ $line['gw'] }}</td>
                 <td>{{ $line['nw'] }}</td>
@@ -50,7 +52,7 @@
 
         {{-- baris kosong sebelum total --}}
         <tr>
-            <td colspan="{{ 17 + count($sizes) }}"></td>
+            <td colspan="{{ 18 + count($sizes) }}"></td>
         </tr>
 
         <tr>
@@ -62,6 +64,7 @@
             <td></td>
             <td></td>
             <td>{{ $totals['ttl_ctn'] }}</td>
+            <td></td>
             @foreach ($sizes as $label)
                 <td></td>
             @endforeach
