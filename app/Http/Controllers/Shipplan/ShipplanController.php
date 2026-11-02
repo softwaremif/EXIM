@@ -3453,7 +3453,6 @@ class ShipplanController extends Controller
         }
 
         DB::beginTransaction();
-        $andon->beginTransaction();
 
         try {
             DB::table('export')->where('exportpk', $exportpk)->lockForUpdate()->first();
@@ -3467,7 +3466,6 @@ class ShipplanController extends Controller
             $buyer = trim((string) $export->buyer);
             if ($buyer === '') {
                 DB::rollBack();
-                $andon->rollBack();
                 return response()->json(['success' => false, 'message' => 'Buyer shipment plan ini belum terisi.'], 422);
             }
 
@@ -3484,49 +3482,33 @@ class ShipplanController extends Controller
                     continue;
                 }
 
-                $cartons = function () use ($andon, $pono, $op, $poref, $buyer, $wherePoref) {
-                    return $andon->table('pack')
-                        ->whereNull('exportpk')
-                        ->where('POno', $pono)
-                        ->where('OP', $op)
-                        ->whereIn('popk', function ($q) use ($poref, $buyer, $wherePoref) {
-                            $q->select('popk')->from('po')
-                                ->where(self::PO_BUYER_COL, $buyer);   // buyer dari tabel po
-                            $wherePoref($q, $poref);
-                        });
-                };
+                // PO harus ada di tabel po dengan buyer yang sama
+                $poOk = $wherePoref($andon->table('po'), $poref)
+                    ->where('POno', $pono)->where('OP', $op)
+                    ->where('po.' . self::PO_BUYER_COL, $buyer)
+                    ->exists();
 
-                $ctn = $cartons()->count();
-                $qty = 0;
-
-                if ($ctn > 0) {
-                    $qty = (int) $cartons()->sum('pcsp');
-                    $cartons()->update(['exportpk' => $exportpk]);   // assign carton ke shipment plan
-                } else {
-                    // belum ada carton bebas: valid hanya kalau PO ada di tabel po (buyer sama)
-                    // dan memang belum punya pack sama sekali
-                    $poOk = $wherePoref($andon->table('po'), $poref)
-                        ->where('POno', $pono)->where('OP', $op)
-                        ->where('po.' . self::PO_BUYER_COL, $buyer)
-                        ->exists();
-
-                    $hasAnyPack = $andon->table('pack')
-                        ->where('POno', $pono)->where('OP', $op)
-                        ->whereIn('popk', function ($q) use ($poref, $wherePoref) {
-                            $q->select('popk')->from('po');
-                            $wherePoref($q, $poref);
-                        })
-                        ->exists();
-
-                    if (!$poOk) {
-                        $skipped[] = $pono . ' (PO tidak ditemukan / beda buyer)';
-                        continue;
-                    }
-                    if ($hasAnyPack) {
-                        $skipped[] = $pono . ' (carton sudah dipakai shipment plan lain)';
-                        continue;
-                    }
+                if (!$poOk) {
+                    $skipped[] = $pono . ' (PO tidak ditemukan / beda buyer)';
+                    continue;
                 }
+
+                // tabel pack hanya dibaca untuk total ctn/qty, tidak diubah --
+                // pack.exportpk diisi oleh sistem Packing saat carton di-load
+                $cartons = $andon->table('pack')
+                    ->whereNull('exportpk')
+                    ->where('POno', $pono)
+                    ->where('OP', $op)
+                    ->whereIn('popk', function ($q) use ($poref, $buyer, $wherePoref) {
+                        $q->select('popk')->from('po')
+                            ->where(self::PO_BUYER_COL, $buyer);   // buyer dari tabel po
+                        $wherePoref($q, $poref);
+                    })
+                    ->selectRaw('COUNT(*) as ctn, COALESCE(SUM(pcsp),0) as qty')
+                    ->first();
+
+                $ctn = (int) $cartons->ctn;
+                $qty = (int) $cartons->qty;
 
                 DB::table('poexport')->insert([
                     'exportpk' => $exportpk,
@@ -3551,7 +3533,6 @@ class ShipplanController extends Controller
 
             if (empty($addedPo)) {
                 DB::rollBack();
-                $andon->rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'Tidak ada PO yang ditambahkan. ' . implode('; ', $skipped),
@@ -3579,7 +3560,6 @@ class ShipplanController extends Controller
             $this->syncExportPopks($exportpk, $addedPopks);
 
             DB::commit();
-            $andon->commit();
 
             return response()->json([
                 'success' => true,
@@ -3590,7 +3570,6 @@ class ShipplanController extends Controller
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
-            $andon->rollBack();
             return response()->json(['success' => false, 'message' => 'Gagal menambah PO: ' . $e->getMessage()], 500);
         }
     }
