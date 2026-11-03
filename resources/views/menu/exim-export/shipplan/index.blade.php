@@ -697,6 +697,53 @@
             font-size: .86rem;
         }
 
+        .sp-stuffing {
+            min-width: 120px;
+        }
+
+        .sp-stuffing-head {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .sp-stuffing-pct {
+            font-weight: 700;
+            font-size: .95rem;
+        }
+
+        .sp-stuffing-count {
+            font-size: .74rem;
+            color: #98A2B3;
+        }
+
+        .sp-stuffing-track {
+            height: 5px;
+            margin-top: 4px;
+            border-radius: 999px;
+            background: #EAECF0;
+            overflow: hidden;
+        }
+
+        .sp-stuffing-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: currentColor;
+        }
+
+        .sp-stuffing-done {
+            color: #12A150;
+        }
+
+        .sp-stuffing-progress {
+            color: #2F6FED;
+        }
+
+        .sp-stuffing-empty {
+            color: #98A2B3;
+        }
+
         .sp-cell-num-sub {
             font-size: .68rem;
             color: #98A2B3;
@@ -2773,6 +2820,7 @@
                             <td>${formatPoActions(p)}</td>
                             <td>${formatOrderInfo2(p.ordno, p)}</td>
                             <td class="text-center">${formatQty(p.qty, p)}</td>
+                            <td class="text-center">${p.po_gac ? `<span class="sp-cell-date">${formatDate(p.po_gac)}</span>` : `<span class="sp-cell-date sp-date-empty">-</span>`}</td>
                             <td class="text-center"><span class="sp-cell-mono">${p.invs ? escapeHtml(p.invs) : '-'}</span></td>
                             <td class="text-center"><span class="sp-cell-mono">${p.pebno ? escapeHtml(p.pebno) : '-'}</span></td>
                             <td class="text-center">${escapeHtml(p.mif || '-')}</td>
@@ -2793,12 +2841,13 @@
                                     <th style="width:90px"></th>
                                     <th>OP / Style</th>
                                     <th style="width:110px" class="text-center">Qty (PCS)</th>
+                                    <th style="width:130px" class="text-center">Buyer Ex-Factory</th>
                                     <th style="width:150px" class="text-center">INV No</th>
                                     <th style="width:150px" class="text-center">PEB No</th>
                                     <th style="width:110px" class="text-center">Factory</th>
                                 </tr>
                             </thead>
-                            <tbody>${body || '<tr><td colspan="7" class="text-center text-muted">Tidak ada PO</td></tr>'}</tbody>
+                            <tbody>${body || '<tr><td colspan="8" class="text-center text-muted">Tidak ada PO</td></tr>'}</tbody>
                         </table>
                     </div>
                 `;
@@ -2866,6 +2915,30 @@
                         <div class="cs-sub">${escapeHtml(row.buyer || '-')}</div>
                         <div class="cs-sub">PO : ${escapeHtml(ponos.join(', ') || '-')}</div>
                         <div class="cs-sub"><span class="sp-po-count-chip"><i class="bi bi-list-ul"></i> ${row.po_count || 0} PO</span></div>
+                    </div>
+                `;
+            }
+
+            // progres carton yang sudah masuk container dalam 1 shipment plan
+            function formatStuffing(v, row) {
+                const total = Number(row.ctn_total || 0);
+                const loaded = Number(row.ctn_loaded || 0);
+
+                if (total === 0) {
+                    return `<span class="sp-cell-date sp-date-empty">Belum ada carton</span>`;
+                }
+
+                const pct = Math.min(100, Math.floor((loaded / total) * 100));
+                const level = pct >= 100 ? 'done' : (pct > 0 ? 'progress' : 'empty');
+                const fmt = n => n.toLocaleString('en-US');
+
+                return `
+                    <div class="sp-stuffing sp-stuffing-${level}">
+                        <div class="sp-stuffing-head">
+                            <span class="sp-stuffing-pct">${pct}%</span>
+                            <span class="sp-stuffing-count">${fmt(loaded)} / ${fmt(total)} ctn</span>
+                        </div>
+                        <div class="sp-stuffing-track"><div class="sp-stuffing-fill" style="width:${pct}%"></div></div>
                     </div>
                 `;
             }
@@ -2978,13 +3051,6 @@
                                 width: 120,
                                 formatter: v => formatDateTimeCell(v),
                             },
-                            {
-                                field: 'GAC',
-                                title: 'Buyer<br>Ex-Factory',
-                                width: 120,
-                                formatter: v => v ? `<span class="sp-cell-date">${formatDate(v)}</span>` :
-                                    `<span class="sp-cell-date sp-date-empty">-</span>`,
-                            },
                             // {
                             //     field: 'buyer',
                             //     title: 'Buyer',
@@ -3065,6 +3131,12 @@
                                 formatter: function(v) {
                                     return `<div class="sp-cell-buyer"><span>${escapeHtml( v || '-')}</span></div>`;
                                 },
+                            },
+                            {
+                                field: 'ctn_loaded',
+                                title: 'Stuffing',
+                                width: 170,
+                                formatter: formatStuffing,
                             },
                             {
                                 field: 'status',

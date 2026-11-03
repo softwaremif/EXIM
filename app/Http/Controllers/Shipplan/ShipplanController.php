@@ -147,10 +147,65 @@ class ShipplanController extends Controller
             return $row;
         });
 
+        $this->addStuffingToRows($rows);
+
         return response()->json([
             'total' => $total,
             'rows' => $rows,
         ]);
+    }
+
+    // ============================================================
+    // PROGRES STUFFING per shipment (kolom "Stuffing" di list)
+    // - total  = carton milik popks shipment yang belum dimuat ke shipment
+    //            lain (pack.exportpk kosong / = shipment ini)
+    // - loaded = carton yang sudah masuk container shipment ini
+    // 1 carton fisik dihitung 1x: Bundle via bundlepk, Mix via mixno,
+    // selain itu carton + popk (sama dengan grouping API Packing)
+    // ============================================================
+    private function addStuffingToRows($rows): void
+    {
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        $popksByExport = DB::table('export')
+            ->whereIn('exportpk', $rows->pluck('exportpk')->all())
+            ->pluck('popks', 'exportpk')
+            ->map(fn($popks) => collect(explode(',', (string) $popks))
+                ->map(fn($v) => (int) trim($v))
+                ->filter()
+                ->unique()
+                ->values());
+
+        $allPopks = $popksByExport->flatten()->unique()->values();
+        $packsByPopk = collect();
+
+        if ($allPopks->isNotEmpty()) {
+            $packsByPopk = DB::connection('mysql_andon')
+                ->table('pack')
+                ->whereIn('popk', $allPopks->all())
+                ->where('pcsp', '>', 0)
+                ->where(function ($q) use ($popksByExport) {
+                    $q->whereNull('exportpk')->orWhereIn('exportpk', $popksByExport->keys()->all());
+                })
+                ->selectRaw("DISTINCT popk, exportpk, (contpk IS NOT NULL) AS in_cont,
+                    COALESCE(CONCAT('B', NULLIF(bundlepk, 0)), CONCAT('M', NULLIF(mixno, '')), CONCAT('S', carton, '|', popk)) AS ctn_key")
+                ->get()
+                ->groupBy('popk');
+        }
+
+        foreach ($rows as $row) {
+            $exportpk = (int) $row->exportpk;
+            $packs = collect($popksByExport->get($exportpk, []))
+                ->flatMap(fn($popk) => $packsByPopk->get($popk, []))
+                ->filter(fn($p) => $p->exportpk === null || (int) $p->exportpk === $exportpk);
+
+            $row->ctn_total = $packs->pluck('ctn_key')->unique()->count();
+            $row->ctn_loaded = $packs
+                ->filter(fn($p) => (int) $p->exportpk === $exportpk && $p->in_cont)
+                ->pluck('ctn_key')->unique()->count();
+        }
     }
 
     // private function addOrderImageToRows($rows): void
@@ -2349,27 +2404,39 @@ class ShipplanController extends Controller
         // MIF per POno + OP + poref dari po.mif (mysql_andon) -- dipakai
         // tombol download packing list (parameter mif). po.mif kosong -> 2
         $poMifMap = collect();
+        $poGacMap = collect();
 
         if ($ponoList->isNotEmpty()) {
-            $poMifMap = DB::connection('mysql_andon')
+            $poRows = DB::connection('mysql_andon')
                 ->table('po')
                 ->whereIn('POno', $ponoList)
-                ->get(['POno', 'OP', 'poref', 'mif'])
-                ->groupBy(fn($item) => $item->POno . '|' . $item->OP . '|' . (string) $item->poref)
-                ->map(fn($items) => $items->pluck('mif')
-                    ->map(fn($mif) => (int) $mif ?: 2)
-                    ->unique()
-                    ->sort()
-                    ->values()
-                    ->all());
+                ->get(['POno', 'OP', 'poref', 'mif', 'GAC'])
+                ->groupBy(fn($item) => $item->POno . '|' . $item->OP . '|' . (string) $item->poref);
+
+            $poMifMap = $poRows->map(fn($items) => $items->pluck('mif')
+                ->map(fn($mif) => (int) $mif ?: 2)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all());
+
+            // Buyer Ex-Factory per PO dari po.GAC (varchar) -- hanya yang
+            // berformat tanggal valid (Y-m-d), selain itu dianggap kosong
+            $poGacMap = $poRows->map(fn($items) => $items->pluck('GAC')
+                ->map(fn($gac) => trim((string) $gac))
+                ->filter(fn($gac) => preg_match('/^\d{4}-\d{2}-\d{2}/', $gac))
+                ->sort()
+                ->first());
         }
 
-        return $result->values()->map(function ($row, $index) use ($ordMap, $packMap, $mifMap, $poMifMap, $offset) {
+        return $result->values()->map(function ($row, $index) use ($ordMap, $packMap, $mifMap, $poMifMap, $poGacMap, $offset) {
             $ord = $ordMap->get($row->ordpk);
             $pack = $packMap->get($row->POno);
 
             $row->mif = $mifMap->get($row->POno . '|' . $row->OP) ?: 'MIF 2';
             $row->po_mif = $poMifMap->get($row->POno . '|' . $row->OP . '|' . (string) $row->poref) ?: [2];
+            // po.GAC kosong -> pakai Buyer Ex-Factory di header shipment (export.GAC)
+            $row->po_gac = $poGacMap->get($row->POno . '|' . $row->OP . '|' . (string) $row->poref) ?: ($row->GAC ?? null);
 
             $row->no = $offset + $index + 1;
             $row->ordno = !empty($row->OP) ? $row->OP : ($ord->ordno ?? '-');
