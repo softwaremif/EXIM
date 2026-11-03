@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Session;
 use App\Models\Container;
 use App\Models\Export;
 use App\Models\Exportdt;
+use App\Services\StuffingProgress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -155,42 +156,15 @@ class ShipplanController extends Controller
         ]);
     }
 
-    // ============================================================
-    // PROGRES STUFFING per shipment (kolom "Stuffing" di list)
-    // - total  = carton yang dialokasikan EXIM ke container shipment ini
-    //            (pack.exportpk = shipment ini & pack.contpk terisi)
-    // - loaded = dari carton tsb, yang sudah discan masuk container di
-    //            FG Stuffing (pack.status 6 = Stuffing, 7 = Shipment)
-    // 1 carton fisik dihitung 1x, grouping SAMA dengan API Packing:
-    // Bundle via bundlepk, Mix via mixno, selain itu
-    // carton + POno + OP + poref + part (1 PO bisa punya beberapa popk)
-    // ============================================================
+    // kolom "Stuffing" di list -- detail perhitungan lihat StuffingProgress
     private function addStuffingToRows($rows): void
     {
-        if ($rows->isEmpty()) {
-            return;
-        }
-
-        $packsByExport = DB::connection('mysql_andon')
-            ->table('pack')
-            ->leftJoin('po', 'po.popk', '=', 'pack.popk')
-            ->whereIn('pack.exportpk', $rows->pluck('exportpk')->all())
-            ->whereNotNull('pack.contpk')
-            ->selectRaw("DISTINCT pack.exportpk, (pack.status IN (6, 7)) AS stuffed,
-                COALESCE(
-                    CONCAT('B', NULLIF(pack.bundlepk, 0)),
-                    CONCAT('M', NULLIF(pack.mixno, '')),
-                    CONCAT('S', IFNULL(pack.carton, ''), '|', IFNULL(pack.POno, ''), '|', IFNULL(pack.OP, ''), '|',
-                        IFNULL(po.poref, ''), '|', IFNULL(NULLIF(pack.part, 0), ''))
-                ) AS ctn_key")
-            ->get()
-            ->groupBy('exportpk');
+        $progress = StuffingProgress::forExports($rows->pluck('exportpk'));
 
         foreach ($rows as $row) {
-            $packs = $packsByExport->get($row->exportpk, collect());
-
-            $row->ctn_total = $packs->pluck('ctn_key')->unique()->count();
-            $row->ctn_loaded = $packs->where('stuffed', 1)->pluck('ctn_key')->unique()->count();
+            $p = $progress->get((int) $row->exportpk, ['loaded' => 0, 'total' => 0]);
+            $row->ctn_loaded = $p['loaded'];
+            $row->ctn_total = $p['total'];
         }
     }
 

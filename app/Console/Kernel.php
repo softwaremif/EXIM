@@ -18,6 +18,11 @@ class Kernel extends ConsoleKernel
         // $schedule->command('inspire')->hourly();
 
         $schedule->command('po:sync-import-status')->everyMinute();
+
+        // email PIC: stuffing 100% tapi status shipment masih Confirm
+        $schedule->command('shipplan:notify-stuffing-complete')
+            ->dailyAt('08:00')
+            ->withoutOverlapping();
     }
 
     /**
