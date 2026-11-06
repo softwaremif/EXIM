@@ -404,6 +404,26 @@ class ShipplanController extends Controller
 
         // dd($validated['exportpk']);
 
+        // kalau masih ada carton yang di-load di container, tidak boleh cancel (sama seperti deletePo)
+        $loaded = DB::connection('mysql_andon')->table('pack')
+            ->where('exportpk', $validated['exportpk'])
+            ->whereNotNull('contpk')
+            ->selectRaw('contpk, COUNT(*) AS total')
+            ->groupBy('contpk')
+            ->pluck('total', 'contpk');
+
+        if ($loaded->isNotEmpty()) {
+            $contnos = Container::whereIn('contpk', $loaded->keys())->pluck('contno', 'contpk');
+            $names = $loaded->keys()
+                ->map(fn($contpk) => ($contnos[$contpk] ?? null) ?: ('#' . $contpk))
+                ->implode(', ');
+
+            return response()->json([
+                'message' => "Masih ada {$loaded->sum()} carton yang sudah di-load di container ({$names}). "
+                    . 'Unload dulu carton dari container, baru shipment bisa di-cancel.'
+            ], 422);
+        }
+
         DB::beginTransaction();
         try {
             $export = DB::table('export')->where('exportpk', $validated['exportpk'])->first();
