@@ -13,12 +13,20 @@ use App\Http\Controllers\EximExportController;
 use App\Http\Controllers\EximImportController;
 use App\Http\Controllers\Packing\PackingController;
 use App\Http\Controllers\Shipplan\ShipplanController;
+// use App\Http\Controllers\Security\GateAppController;
+// use App\Http\Controllers\Security\GateController;
+// use App\Http\Controllers\Security\GateDocController;
 
 
 Route::get('/', [LoginController::class, 'index'])->name('login.index');
 Route::post('login', [LoginController::class, 'login'])->name('login');
 Route::get('loading', [LoginController::class, 'loading'])->name('loading');
 Route::get('logout', [LoginController::class, 'logout'])->name('logout');
+// aplikasi layar utama Security Gate (tanpa login: manifest diambil browser tanpa cookie sesi);
+// login & logout security di bawah security/gate supaya tetap di dalam cakupan aplikasi (layar penuh)
+// Route::get('security/gate/app.webmanifest', [GateAppController::class, 'manifest'])->name('security.gate.manifest');
+// Route::get('security/gate/login', [GateAppController::class, 'login'])->name('security.gate.login');
+// Route::get('security/gate/logout', [GateAppController::class, 'logout'])->name('security.gate.logout');
 
 Route::middleware(['check'])->group(function () {
     Route::post('updtpswdb', [LoginController::class, 'updtpswdb'])->name('updtpswdb');
@@ -102,6 +110,25 @@ Route::middleware(['check'])->group(function () {
     //export
     Route::get('/exim-export/shipplan/index', [ShipplanController::class, 'index'])->name('shipplan.index');
     Route::get('/exim-export/shipplan/detail_ship/{exportpk}', [ShipplanController::class, 'detail_ship'])->name('shipplan.detail_ship');
+
+    // dokumen cetak dari data security gate (dibuka dari EXIM & security)
+    // Route::get('/container/{contpk}/dokumen/{doc}', [GateDocController::class, 'show'])->where('doc', 'checklist|stuffing|pengiriman')->name('container.doc');
+
+    //security gate (guserpk 46)
+    // Route::get('/security/gate', [GateController::class, 'index'])->name('security.gate.index');
+    // Route::get('/security/gate/employee', [GateController::class, 'employee'])->name('security.gate.employee');
+    // Route::post('/security/gate/{contpk}/draft', [GateController::class, 'draft'])->name('security.gate.draft');
+    // Route::post('/security/gate/{contpk}/upload', [GateController::class, 'upload'])->name('security.gate.upload');
+    // Route::post('/security/gate/{contpk}/media-delete', [GateController::class, 'deleteFoto'])->name('security.gate.media-delete');
+    // Route::post('/security/gate/{contpk}/out', [GateController::class, 'checkout'])->name('security.gate.out');
+    // Route::post('/security/gate/{contpk}/update', [GateController::class, 'update'])->name('security.gate.update');
+    // Route::post('/security/gate/{contpk}/stuffing', [GateController::class, 'stuffing'])->name('security.gate.stuffing');
+    // Route::post('/security/gate/{contpk}/seal', [GateController::class, 'seal'])->name('security.gate.seal');
+    // ceklis carton per container (data di Packing List, lewat API)
+    // Route::get('/security/gate/{contpk}/cartons', [GateController::class, 'cartons'])->name('security.gate.cartons');
+    // Route::get('/security/gate/{contpk}/cartons/detail', [GateController::class, 'cartonDetail'])->name('security.gate.cartons.detail');
+    // Route::post('/security/gate/{contpk}/cartons', [GateController::class, 'checkCartons'])->name('security.gate.cartons.check');
+    // Route::post('/security/gate/{contpk}', [GateController::class, 'store'])->name('security.gate.store');
 });
 //Tabel
 Route::get('tabel-gudang', [TabelController::class, 'ListGudang'])->name('list.tab-gudang');
@@ -179,6 +206,7 @@ Route::post('cancelinvs', [InvoiceController::class, 'cancelinvs'])->name('cance
     Route::post('/containers/load', [ShipplanController::class, 'load_container'])->name('containers.load');
     Route::post('/containers/unload', [ShipplanController::class, 'unload_carton'])->name('containers.unload');
     Route::post('/containers/unload_all', [ShipplanController::class, 'unload_all_carton'])->name('containers.unload_all');
+    // Route::post('/containers/{contpk}/replace', [ShipplanController::class, 'replaceContainer'])->name('containers.replace');
     Route::get('/export/{exportpk}/detail-json', [ShipplanController::class, 'detail_json'])->name('export.detail-json');
     Route::post('/shipment-plan/toggle-publish', [ShipplanController::class, 'togglePublish'])->name('shipment-plan.toggle-publish');
     Route::post('/shipment-plan/toggle-lock', [ShipplanController::class, 'toggleLock'])->name('shipment-plan.toggle-lock');
@@ -198,6 +226,9 @@ Route::post('cancelinvs', [InvoiceController::class, 'cancelinvs'])->name('cance
 
     //download PDF packing list (proxy ke finishing-packing)
     Route::get('/export/packing-list-pdf', [ShipplanController::class, 'packingListPdf'])->name('export.packing-list-pdf');
+    // modal packing list PDF per PO (Actual / Custom QTY) -- API finishing-packing /api/sps/packing-list*
+    Route::get('/export/packing-list-options', [ShipplanController::class, 'packingListOptions'])->name('export.packing-list-options');
+    Route::get('/export/packing-list-link', [ShipplanController::class, 'packingListLink'])->name('export.packing-list-link');
 
     //add PO
     Route::get('/export/{exportpk}/available-po', [ShipplanController::class, 'availablePo'])->name('export.available-po');

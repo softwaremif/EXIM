@@ -233,23 +233,56 @@
         }
 
         /* filter + sort dalam 1 baris; kotak pencarian yang menyusut/melebar */
+        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+        /* filter di kiri (boleh turun baris, jarak seragam), aksi (muat ulang, export, urutkan) selalu bersama di kanan */
+        --}}
         .sp-toolbar {
             flex-wrap: nowrap;
+            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+            align-items: flex-start;
+            gap: 16px;
+            --}}
         }
 
         .sp-filters {
             display: flex;
+            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+            flex-wrap: wrap;
+            --}}
             align-items: center;
+            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+            gap: 8px;
+            --}}
             flex: 1;
             min-width: 0;
         }
 
+        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+        /* jarak antar filter dari gap, bukan padding pembungkus; flex supaya combobox easyui (inline-block)
+           tidak menambah celah baseline -> semua kotak tepat 42px dan sejajar */
+        --}}
         .sp-filters>.ps-2 {
+            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+            display: flex;
+            align-items: center;
+            --}}
             flex-shrink: 0;
+            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+            padding-left: 0 !important;
+        }
+
+        .sp-filters .textbox {
+            vertical-align: top;
+            --}}
         }
 
         .sp-filters .sp-search-box {
             flex: 1;
+            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+            display: flex;
+            align-items: center;
+            flex: 1 1 200px;
+            --}}
             min-width: 180px;
             max-width: 320px;
         }
@@ -264,6 +297,13 @@
                 flex-wrap: wrap;
                 row-gap: 8px;
             }
+        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+        .sp-toolbar__actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        --}}
         }
 
         /* ================= SORT ================= */
@@ -498,6 +538,74 @@
                 opacity: 1;
                 transform: scale(1);
             }
+        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+        }
+
+        /* checkbox filter toolbar (Tampilkan cancel), tinggi sama dengan tombol refresh */
+        .sp-check {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 42px;
+            margin: 0;
+            padding: 0 12px 0 10px;
+            border: 1.5px solid #D0D5DD;
+            border-radius: 10px;
+            background: #fff;
+            color: #344054;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            transition: background .15s ease, border-color .15s ease;
+        }
+
+        .sp-check input {
+            position: absolute;
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+        }
+
+        .sp-check__box {
+            display: grid;
+            place-items: center;
+            width: 18px;
+            height: 18px;
+            border: 1.5px solid #98A2B3;
+            border-radius: 5px;
+            background: #fff;
+            color: #fff;
+            font-size: 13px;
+            transition: background .15s ease, border-color .15s ease;
+        }
+
+        .sp-check__box i {
+            opacity: 0;
+            line-height: 1;
+        }
+
+        .sp-check:has(input:checked) {
+            border-color: #FDA29B;
+            background: #FEF3F2;
+            color: #B42318;
+        }
+
+        .sp-check input:checked+.sp-check__box {
+            border-color: #D92D20;
+            background: #D92D20;
+        }
+
+        .sp-check input:checked+.sp-check__box i {
+            opacity: 1;
+        }
+
+        .sp-check input:focus-visible+.sp-check__box {
+            outline: 3px solid #84ADFF;
+            outline-offset: 2px;
+        --}}
         }
 
         .sp-refresh-btn {
@@ -2668,13 +2776,37 @@
         function myparser2(s) {
             if (!s) {
                 return new Date();
+        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+        // "dd/mm/yyyy HH:mm" -> Date, atau null kalau tidak valid. Jam boleh diketik
+        // 14:30, 14.30, atau 1430. Tanggal/jam di luar rentang (mis. 31/02, jam 25) tidak
+        // digeser diam-diam ke tanggal lain seperti new Date(), tapi dianggap tidak valid.
+        function parseDmyHm(s) {
+            var m = String(s || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2})(?:[:.]?(\d{2}))?(?::\d{2})?)?$/);
+            if (!m) {
+                return null;
+        --}}
             }
 
             // Format: dd/mm/yyyy HH:mm
             var parts = s.split(' ');
+            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+            var day = parseInt(m[1], 10);
+            var month = parseInt(m[2], 10);
+            var year = parseInt(m[3], 10);
+            var hour = m[4] !== undefined ? parseInt(m[4], 10) : 0;
+            var minute = m[5] !== undefined ? parseInt(m[5], 10) : 0;
+            --}}
 
             var datePart = parts[0];
             var timePart = parts[1] || '00:00';
+            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+            var d = new Date(year, month - 1, day, hour, minute);
+            if (hour > 23 || minute > 59 || d.getDate() !== day || d.getMonth() !== month - 1) {
+                return null;
+            }
+            return d;
+        }
+            --}}
 
             var dateParts = datePart.split('/');
             var timeParts = timePart.split(':');
@@ -2701,6 +2833,10 @@
             }
 
             return new Date();
+        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+        function myparser2(s) {
+            return parseDmyHm(s) || new Date();
+        --}}
         }
 
         function myparser3(s) {
@@ -2787,15 +2923,16 @@
                         + `<i class="bi bi-trash"></i></a>`;
                 }
 
-                // row.po_mif: daftar po.mif (mysql_andon) PO ini, mis. [2] / [1, 2] -> 1 tombol per MIF
-                const mifs = Array.isArray(row.po_mif) && row.po_mif.length ? row.po_mif : [2];
-                mifs.forEach(mif => {
-                    const label = mifs.length > 1 ? `<span class="sp-po-action-badge">${mif}</span>` : '';
-                    html += `<a href="${packingListPdfUrl(row, mif)}" target="_blank" rel="noopener" class="sp-po-action text-primary"`
-                        + ` data-bs-toggle="tooltip" title="Download Packing List"`
-                        + ` onclick="event.stopPropagation()">`
-                        + `<i class="bi bi-file-earmark-pdf"></i>${label}</a>`;
-                });
+                // 1 ikon PDF per PO -> modal "Pilih Warna untuk Print" (modal/modalPackingListPdf):
+                // PDF Actual / Custom QTY, packing list per unit dipilih di modal (bukan 1 ikon per MIF)
+                const attr = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+                const idship = row.idship || ('SP' + String(row.exportpk || '').padStart(4, '0'));
+                html += `<a href="javascript:void(0)" class="sp-po-action text-primary"`
+                    + ` data-bs-toggle="tooltip" title="Download Packing List"`
+                    + ` data-po="${attr(row.POno)}" data-op="${attr(row.OP)}" data-poref="${attr(row.poref)}"`
+                    + ` data-exportpk="${attr(row.exportpk)}" data-idship="${attr(idship)}"`
+                    + ` onclick="event.stopPropagation(); var t = bootstrap.Tooltip.getInstance(this); if (t) t.hide(); openPackingListModal(this)">`
+                    + `<i class="bi bi-file-earmark-pdf"></i></a>`;
 
                 return `<div class="sp-po-actions">${html}</div>`;
             }
@@ -2946,6 +3083,12 @@
             function initGrid() {
                 $('#dgShipmentPlan').datagrid({
                     url: "{{ route('shipplan.getListExportGrouped') }}",
+                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                    // pemuatan pertama ikut checkbox "Tampilkan cancel" (lihat showCancelParam)
+                    queryParams: {
+                        show_cancel: showCancelParam()
+                    },
+                    --}}
                     view: detailview,
                     width: '100%',
                     height: 'auto',
@@ -3360,8 +3503,32 @@
                     status: document.getElementById('spFilterStatus').value || '',
                     searchByRangeDay: $('#filterday').combobox('getValue') || '',
                     searchByRangeEca: $('#filterdayEca').combobox('getValue') || '',
+                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                    show_cancel: showCancelParam(),
+                    --}}
                 });
             };
+        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+
+            // checkbox "Tampilkan cancel": bawaan tidak dicentang (shipment cancel disembunyikan).
+            // Filter Status = Cancel Shipment tetap menampilkan yang cancel walau tidak dicentang.
+            window.showCancelParam = function() {
+                const cb = document.getElementById('spShowCancel');
+                return cb && cb.checked ? '1' : '0';
+            };
+            window.onShowCancelChange = function() {
+                try {
+                    localStorage.setItem('spShowCancel', showCancelParam());
+                } catch (e) {}
+                reloadSpGrid();
+            };
+            (function() {
+                const cb = document.getElementById('spShowCancel');
+                try {
+                    if (cb) cb.checked = localStorage.getItem('spShowCancel') === '1';
+                } catch (e) {}
+            })();
+        --}}
 
             let searchTimer = null;
             window.onSpSearch = function() {
@@ -3379,6 +3546,9 @@
                     status: document.getElementById('spFilterStatus').value || '',
                     searchByRangeDay: $('#filterday').combobox('getValue') || '',
                     searchByRangeEca: $('#filterdayEca').combobox('getValue') || '',
+                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                    show_cancel: showCancelParam(),
+                    --}}
                 };
 
                 window.location.href = '{{ route('export.excel') }}?' + $.param(params);
@@ -3959,6 +4129,9 @@
 
             if (!dg.length || !$.data(dg[0], 'datagrid')) {
                 $.messager.alert('Error', 'DataGrid belum siap.', 'error');
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                appAlert('DataGrid belum siap. Muat ulang halaman lalu coba lagi.', { type: 'error' });
+                --}}
                 return;
             }
 
@@ -3966,6 +4139,9 @@
 
             if (!rows || rows.length === 0) {
                 $.messager.alert('Warning', 'Silakan pilih data terlebih dahulu.', 'warning');
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                appAlert('Silakan pilih data terlebih dahulu.', { type: 'warning', title: 'Belum ada data dipilih' });
+                --}}
                 return;
             }
 
@@ -4505,6 +4681,9 @@
 
             if (!dg.length || !$.data(dg[0], 'datagrid')) {
                 $.messager.alert('Error', 'DataGrid belum siap.', 'error');
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                appAlert('DataGrid belum siap. Muat ulang halaman lalu coba lagi.', { type: 'error' });
+                --}}
                 return;
             }
 
@@ -4512,6 +4691,9 @@
 
             if (!rows || rows.length === 0) {
                 $.messager.alert('Warning', 'Silakan pilih data terlebih dahulu.', 'warning');
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                appAlert('Silakan pilih data terlebih dahulu.', { type: 'warning', title: 'Belum ada data dipilih' });
+                --}}
                 return;
             }
 
@@ -4600,6 +4782,9 @@
 
             if (!dg.length || !$.data(dg[0], 'datagrid')) {
                 $.messager.alert('Error', 'DataGrid belum siap.', 'error');
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                appAlert('DataGrid belum siap. Muat ulang halaman lalu coba lagi.', { type: 'error' });
+                --}}
                 return;
             }
 
@@ -4607,6 +4792,9 @@
 
             if (!rows || rows.length === 0) {
                 $.messager.alert('Warning', 'Silakan pilih data terlebih dahulu.', 'warning');
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                appAlert('Silakan pilih data terlebih dahulu.', { type: 'warning', title: 'Belum ada data dipilih' });
+                --}}
                 return;
             }
 
@@ -4745,6 +4933,10 @@
                     if (preset) {
                         $(input).datetimebox('setValue', preset);
                     }
+                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                    // jam tiba diisi security saat gate in; di EXIM hanya ditampilkan
+                    $(input).datetimebox('disable');
+                    --}}
                 } catch (err) {
                     console.error('[shipplan] init datetimebox actcontdate gagal:', err);
                 }
@@ -4804,8 +4996,8 @@
             }
 
             // field teks biasa di kartu arrival; actcontdate ditangani terpisah karena easyui.
-            // noseal ada di kartu tab foto, bukan di sini.
-            const ARRIVAL_TEXT_FIELDS = ['contno', 'nopol'];
+            // No. Seal pindah ke sini dari tab Container Leave.
+            const ARRIVAL_TEXT_FIELDS = ['contno', 'nopol', 'noseal'];
 
             function syncContainerArrivalTab() {
                 const arrivalList = document.getElementById('containerArrivalList');
@@ -4980,6 +5172,102 @@
                 slotEl.querySelector('.container-foto-preview').innerHTML = '';
             }
 
+            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+            // tab Container Leave: data keluar dari security (baca saja), dari detail_json -> gate
+            const containerGateInfo = new Map(); // uid card -> data gate (jam keluar, dokumentasi, dokumen)
+
+            function renderGateLeave(cardEl, gate) {
+                const outInput = cardEl.querySelector('[data-gate="out_at"]');
+                const mediaBox = cardEl.querySelector('[data-gate="media"]');
+                const docsBox = cardEl.querySelector('[data-gate="docs"]');
+                if (!outInput || !mediaBox || !docsBox) return;
+
+                const empty = text => {
+                    const span = document.createElement('span');
+                    span.className = 'gate-empty';
+                    span.textContent = text;
+                    return span;
+                };
+                mediaBox.innerHTML = '';
+                docsBox.innerHTML = '';
+                outInput.value = (gate && gate.out_at) || '';
+
+                if (!gate) {
+                    mediaBox.appendChild(empty('Simpan shipment plan dulu. Data keluar diisi security.'));
+                    docsBox.appendChild(empty('Belum ada dokumen.'));
+                    return;
+                }
+                if (gate.rejected) {
+                    outInput.placeholder = 'Container ditolak security';
+                }
+
+                const photoCount = gate.media.reduce((n, g) => n + g.urls.length, 0);
+                if (!photoCount && !gate.video) {
+                    mediaBox.appendChild(empty(gate.rejected
+                        ? 'Container tidak lulus pemeriksaan, tidak ada pemuatan.'
+                        : 'Belum ada dokumentasi. Diambil security saat selesai stuffing, segel, dan container keluar.'));
+                } else {
+                    gate.media.forEach(group => {
+                        const wrap = document.createElement('div');
+                        wrap.className = 'gate-media-group';
+                        const title = document.createElement('div');
+                        title.className = 'gate-media-group__title';
+                        title.textContent = `${group.label} (${group.urls.length})`;
+                        wrap.appendChild(title);
+                        if (!group.urls.length) {
+                            wrap.appendChild(empty('Tidak ada foto.'));
+                        } else {
+                            const thumbs = document.createElement('div');
+                            thumbs.className = 'gate-thumbs';
+                            group.urls.forEach((url, i) => {
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.target = '_blank';
+                                a.rel = 'noopener';
+                                const img = document.createElement('img');
+                                img.src = url;
+                                img.loading = 'lazy';
+                                img.alt = `${group.label} ${i + 1}`;
+                                a.appendChild(img);
+                                thumbs.appendChild(a);
+                            });
+                            wrap.appendChild(thumbs);
+                        }
+                        mediaBox.appendChild(wrap);
+                    });
+                    if (gate.video) {
+                        // video sebagai grup sendiri supaya sejajar dengan grup foto
+                        const wrap = document.createElement('div');
+                        wrap.className = 'gate-media-group gate-media-group--video';
+                        const title = document.createElement('div');
+                        title.className = 'gate-media-group__title';
+                        title.textContent = 'Video segel';
+                        const video = document.createElement('video');
+                        video.className = 'gate-video';
+                        video.src = gate.video;
+                        video.controls = true;
+                        video.preload = 'metadata';
+                        wrap.append(title, video);
+                        mediaBox.appendChild(wrap);
+                    }
+                }
+
+                if (!gate.docs.length) {
+                    docsBox.appendChild(empty('Dokumen tersedia setelah container tiba dan diperiksa security.'));
+                }
+                gate.docs.forEach(doc => {
+                    const a = document.createElement('a');
+                    a.className = 'btn btn-outline-primary btn-sm';
+                    a.href = doc.url;
+                    a.target = '_blank';
+                    a.rel = 'noopener';
+                    a.innerHTML = '<i class="bi bi-file-earmark-text"></i> ';
+                    a.appendChild(document.createTextNode(doc.label));
+                    docsBox.appendChild(a);
+                });
+            }
+
+            --}}
             function syncContainerFotoTab() {
                 const fotoList = document.getElementById('containerFotoList');
                 const fotoTemplate = document.getElementById('containerFotoCardTemplate');
@@ -5021,6 +5309,9 @@
                     const arrivalItem = arrivalItems[i];
                     const contnoInput = arrivalItem?.querySelector('[data-field="contno"]');
                     el.querySelector('.container-foto-vessel').textContent = contnoInput?.value || '-';
+                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                    renderGateLeave(el, containerGateInfo.get(sourceItem.dataset.uid));
+                    --}}
 
                     const start_ship = sourceItem.querySelector('[data-field="start_ship"]');
                     const btnfoto = el.querySelector('#btn-camera');
@@ -5277,6 +5568,11 @@
                         containerFotoUrls.set(fotoKey(el.dataset.uid, slot), fotoUrls[slot]);
                     }
                 });
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                if (data && data.gate) {
+                    containerGateInfo.set(el.dataset.uid, data.gate);
+                }
+                --}}
 
                 containerList.appendChild(el);
 
@@ -5326,12 +5622,22 @@
                 });
 
 
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                // tanggal & jam bisa diketik langsung atau dipilih dari kalender + spinner jam
+                --}}
                 $('#closetime').datetimebox({
                     editable: false,
+                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                    editable: true,
+                    showSeconds: false,
+                    --}}
                     onChange: function(newValue) {
                         validateAndCorrectCloseTime(newValue);
                     },
                 });
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                bindCloseTimeTyping();
+                --}}
 
                 // kalau ada data pending dari mode edit, isi SEKARANG (widget sudah pasti siap)
                 if (window.__pendingExdateEditData) {
@@ -5372,6 +5678,9 @@
                 containerList.innerHTML = '';
                 containerFotoFiles.clear();
                 containerFotoUrls.clear();
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                containerGateInfo.clear();
+                --}}
                 containerFotoRemoved.clear();
 
                 form.reset();
@@ -5396,6 +5705,9 @@
                 // reset dulu state foto dari sesi sebelumnya
                 containerFotoFiles.clear();
                 containerFotoUrls.clear();
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                containerGateInfo.clear();
+                --}}
                 containerFotoRemoved.clear();
 
                 // dipakai .catch() untuk membedakan gagal ambil data vs gagal merender modal,
@@ -5678,14 +5990,66 @@
 
                 const closeDate = typeof myparser3 === 'function' ? myparser3(newValue) : new Date(newValue);
                 if (!closeDate || isNaN(closeDate.getTime())) return;
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                // saat diketik, onChange terpanggil di setiap ketikan; validasi ditunda sampai
+                // field ditinggalkan (bindCloseTimeTyping) supaya tidak dikosongkan di tengah mengetik
+                if ($('#closetime').datetimebox('textbox').is(':focus')) return;
+                const closeDate = parseDmyHm(newValue);
+                if (!closeDate) return;
+                --}}
 
                 if (closeDate < minDate) {
                     isCorrectingCloseTime = true;
                     $('#closetime').datetimebox('setValue', '');
                     isCorrectingCloseTime = false;
+                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                    // dikosongkan setelah EasyUI selesai setValue; kalau langsung, EasyUI menimpanya
+                    // lagi dengan nilai yang sama dan validasi (serta toast) terjadi dua kali
+                    setTimeout(function() {
+                        isCorrectingCloseTime = true;
+                        $('#closetime').datetimebox('setValue', '');
+                        isCorrectingCloseTime = false;
+                    }, 0);
+                    --}}
 
                     showToast('Close Time tidak boleh lebih awal dari Ex-Factory Date.', 'error');
                 }
+            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+            }
+
+            // EasyUI tidak merapikan teks yang diketik; tanpa ini "16/10/2026 1430" terkirim
+            // apa adanya dan gagal diparse server (format d/m/Y H:i). Dirapikan saat field
+            // ditinggalkan; yang tidak valid dikembalikan ke nilai sebelumnya.
+            function bindCloseTimeTyping() {
+                const $box = $('#closetime');
+                $box.datetimebox('textbox')
+                    .off('.closetime')
+                    .on('focus.closetime', function() {
+                        this.dataset.lastValid = parseDmyHm($box.datetimebox('getValue')) ? $box.datetimebox('getValue') : '';
+                    })
+                    .on('blur.closetime', function() {
+                        // klik di panel kalender/spinner juga memicu blur; biarkan panel yang mengisi
+                        if ($box.datetimebox('panel').is(':visible')) return;
+
+                        const text = $.trim($(this).val());
+                        if (!text) {
+                            $box.datetimebox('setValue', '');
+                            return;
+                        }
+                        const date = parseDmyHm(text);
+                        if (!date) {
+                            $box.datetimebox('setValue', this.dataset.lastValid || '');
+                            showToast('Format Close Time: dd/mm/yyyy HH:mm, contoh 16/10/2026 14:30.', 'error');
+                            return;
+                        }
+                        // validasi dipanggil sekali di sini; onChange tidak terpanggil kalau
+                        // teks ketikan sudah sama persis dengan hasil format
+                        isCorrectingCloseTime = true;
+                        $box.datetimebox('setValue', myformatter2(date));
+                        isCorrectingCloseTime = false;
+                        validateAndCorrectCloseTime(myformatter2(date));
+                    });
+            --}}
             }
 
             function convertDateFields(formData, fields) {
@@ -6325,6 +6689,7 @@
             };
         })();
     </script>
+    @include('menu.exim-export.shipplan.modal.modalPackingListPdfJs')
 @endsection
 
 @section('content')
@@ -6379,6 +6744,9 @@
 
                 {{-- ================= TOOLBAR ================= --}}
                 <div class="sp-toolbar align-items-center justify-content-between">
+                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                <div class="sp-toolbar justify-content-between">
+                --}}
                     <div class="sp-filters">
                         <div class="sp-search-box">
                             <i class="bi bi-search"></i>
@@ -6446,10 +6814,20 @@
                             </select>
                         </div>
 
+                        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                        {{-- tampil / sembunyikan shipment cancel; pilihan disimpan per browser (spShowCancel) -- }}
+                        --}}
                         <div class="ps-2">
                             <button type="button" class="sp-refresh-btn" onclick="reloadSpGrid()" title="Muat ulang">
                                 <i class="bi bi-arrow-clockwise"></i>
                             </button>
+                            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                            <label class="sp-check" for="spShowCancel" title="Tampilkan shipment plan yang dibatalkan">
+                                <input type="checkbox" id="spShowCancel" onchange="onShowCancelChange()">
+                                <span class="sp-check__box"><i class="bi bi-check-lg"></i></span>
+                                <span>Tampilkan cancel</span>
+                            </label>
+                            --}}
                         </div>
                         <div class="ps-2">
                             <button type="button" class="sp-refresh-btn" onclick="exportSpExcel()"
@@ -6458,6 +6836,18 @@
                             </button>
                         </div>
                     </div>
+        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+
+                    {{-- aksi selalu satu kelompok di kanan: muat ulang, export, urutkan -- }}
+                    <div class="sp-toolbar__actions">
+                        <button type="button" class="sp-refresh-btn" onclick="reloadSpGrid()" title="Muat ulang">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button type="button" class="sp-refresh-btn" onclick="exportSpExcel()"
+                            title="Export List Shipment Plan">
+                            <img src="{{ asset('public/css/images/iconExcel.png') }}" alt="Export Excel">
+                        </button>
+        --}}
 
                     <!-- SORT -->
                     <div class="sp-sort dropdown">
@@ -6499,6 +6889,9 @@
                                 </a>
                             </li>
                         </ul>
+                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
+                    </div>
+                    --}}
                     </div>
                 </div>
 
@@ -6599,4 +6992,5 @@
 
     @include('menu.exim-export.shipplan.modal.modalPackingPlan')
     @include('menu.exim-export.shipplan.modal.modalContainer')
+    @include('menu.exim-export.shipplan.modal.modalPackingListPdf')
 @endsection

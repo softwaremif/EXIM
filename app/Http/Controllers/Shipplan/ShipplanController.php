@@ -1763,7 +1763,7 @@ class ShipplanController extends Controller
         ]);
 
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(120)
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(120)
                 ->get(rtrim(config('services.packing.url'), '/') . '/api/packing/laporan-global/pdf', $validated);
         } catch (\Throwable $e) {
             report($e);
@@ -1780,6 +1780,79 @@ class ShipplanController extends Controller
             'Content-Type'        => $response->header('Content-Type') ?: 'text/html; charset=UTF-8',
             'Content-Disposition' => $response->header('Content-Disposition'),
         ]));
+    }
+
+    // ---- Packing list PDF per PO (1 ikon -> modal "Pilih Warna untuk Print") ----
+    // Sama dengan SPS: API finishing-packing Api\SpsPackingListController. Dokumen (PO/OP/POref
+    // per unit), warna, session, dan versi Custom QTY PO ini; link PDF = signed URL 24 jam yang
+    // dibuka browser langsung di finishing-packing tanpa login.
+    public function packingListOptions(Request $request)
+    {
+        $validated = $request->validate([
+            'op'    => 'required|string|max:100',
+            'po'    => 'nullable|string|max:100',
+            'poref' => 'nullable|string|max:100',
+        ]);
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(30)->acceptJson()
+                ->get(rtrim(config('services.packing.url'), '/') . '/api/sps/packing-list', [
+                    'op'    => trim($validated['op']),
+                    'pono'  => trim((string) ($validated['po'] ?? '')),
+                    'poref' => trim((string) ($validated['poref'] ?? '')),
+                ]);
+        } catch (\Throwable $e) {
+            report($e);
+            $response = null;
+        }
+
+        if (!$response || !$response->successful() || !is_array($response->json('documents'))) {
+            return response()->json(['documents' => [], 'error' => 'Daftar packing list tidak dapat dibaca dari finishing-packing.']);
+        }
+
+        return response()->json(['documents' => $response->json('documents'), 'error' => null]);
+    }
+
+    public function packingListLink(Request $request)
+    {
+        $validated = $request->validate([
+            'op'           => 'required|string|max:100',
+            'po'           => 'nullable|string|max:100',
+            'poref'        => 'nullable|string|max:100',
+            'mif'          => 'required|integer',
+            'combos'       => 'nullable|array',
+            'combos.*'     => 'nullable|string|max:300',
+            'shipgroups'   => 'nullable|array',
+            'shipgroups.*' => 'nullable|string|max:50',
+            'exim'         => 'nullable|boolean',
+            'version'      => ['nullable', 'regex:/^[A-Za-z0-9_-]{1,64}$/'],
+        ]);
+        $params = array_filter([
+            'po'         => (string) ($validated['po'] ?? ''),
+            'op'         => $validated['op'],
+            'poref'      => (string) ($validated['poref'] ?? ''),
+            'mif'        => (int) $validated['mif'],
+            'combos'     => $validated['combos'] ?? [],
+            'shipgroups' => $validated['shipgroups'] ?? [],
+            'exim'       => $request->boolean('exim') ? 1 : null,
+            'version'    => $validated['version'] ?? null,
+        ], fn($v) => $v !== null && $v !== []);
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(30)->acceptJson()
+                ->get(rtrim(config('services.packing.url'), '/') . '/api/sps/packing-list/url', $params);
+        } catch (\Throwable $e) {
+            report($e);
+            $response = null;
+        }
+
+        $url = $response && $response->successful() ? $response->json('url') : null;
+        if (!$url) {
+            Log::warning('Link packing list PDF gagal', ['params' => $params, 'status' => $response ? $response->status() : null]);
+            return response()->json(['url' => null, 'error' => 'Link PDF tidak dapat dibuat oleh finishing-packing.']);
+        }
+
+        return response()->json(['url' => $url, 'error' => null]);
     }
 
     private function getLoadedCartonsFromPacking(int $exportpk, int $contpk)
