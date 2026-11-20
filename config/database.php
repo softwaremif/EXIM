@@ -163,6 +163,48 @@ return [
             ]) : [],
         ],
 
+        // karyawan harian lepas (database hl, struktur table kar & dep sama dengan hrd)
+        'mysql_hl' => [
+            'driver' => 'mysql',
+            'url' => env('DATABASE_HL_URL'),
+            'host' => env('DB_HL_HOST', '192.168.0.4'),
+            'port' => env('DB_HL_PORT', '3306'),
+            'database' => env('DB_HL_DATABASE', 'hl'),
+            'username' => env('DB_HL_USERNAME', 'forge'),
+            'password' => env('DB_HL_PASSWORD', ''),
+            'unix_socket' => env('DB_HL_SOCKET', ''),
+            'charset' => 'utf8',
+            'collation' => 'utf8_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => false,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::ATTR_TIMEOUT => 3,   // server hl mati: jangan menahan form security lama
+            ]) : [],
+        ],
+
+        'mysql_hrd' => [
+            'driver' => 'mysql',
+            'url' => env('DATABASE_HRD_URL'),
+            'host' => env('DB_HRD_HOST', '127.0.0.1'),
+            'port' => env('DB_HRD_PORT', '3306'),
+            'database' => env('DB_HRD_DATABASE', 'forge'),
+            'username' => env('DB_HRD_USERNAME', 'forge'),
+            'password' => env('DB_HRD_PASSWORD', ''),
+            'unix_socket' => env('DB_HRD_SOCKET', ''),
+            'charset' => 'utf8',
+            'collation' => 'utf8_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => false,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DATABASE_URL'),

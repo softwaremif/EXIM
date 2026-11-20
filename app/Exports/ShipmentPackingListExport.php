@@ -268,14 +268,15 @@ class ShipmentPackingListExport implements FromView, WithStyles
 
             foreach ($members as $idx => $r) {
                 $first = $idx === 0;
-                $gw = (float) ($r->gw ?? 0);
-                $nw = (float) ($r->nw ?? 0);
+                // GW/NW tersimpan per carton (diulang di tiap baris carton ratio / CMT) -> hanya baris pertama
+                $gw = $first ? (float) ($r->gw ?? 0) : 0.0;
+                $nw = $first ? (float) ($r->nw ?? 0) : 0.0;
 
                 $lines[] = [
                     'POno'          => $r->POno,
                     'customer_po'   => '',
                     'style'         => $r->style,
-                    'color'         => $r->po_material ?: $r->material,
+                    'color'         => $this->colorLabel($r),
                     'unit'          => '',
                     'ctn_from'      => $first ? $members[0]->carton : '',
                     'ctn_to'        => $first ? $cartons[$j][0]->carton : '',
@@ -361,7 +362,7 @@ class ShipmentPackingListExport implements FromView, WithStyles
             'POno'         => $r->POno,
             'customer_po'  => '',
             'style'        => $r->style,
-            'color'        => $r->po_material ?: $r->material,
+            'color'        => $this->colorLabel($r),
             'unit'         => '',
             'ctn_from'     => $r->carton,
             'ctn_to'       => $r->carton,
@@ -402,7 +403,29 @@ class ShipmentPackingListExport implements FromView, WithStyles
         return $members->map(fn($r, $idx) => array_merge($this->singleLine($r, $idx === 0 ? 1 : 0, $this->measurement($r)), [
             'ttl_ctn_label' => $idx === 0 ? 1 : 'REPEATED',
             'remark'        => 'IRREGULAR',
-        ], $idx === 0 ? [] : ['ctn_from' => '', 'ctn_to' => '']))->all();
+        ], $idx === 0 ? [] : ['ctn_from' => '', 'ctn_to' => '', 'gw' => 0.0, 'nw' => 0.0, 'ttl_gw' => 0.0, 'ttl_nw' => 0.0]))->all(); // berat 1x per carton fisik
+    }
+
+    // Warna baris; order CMT: barang subkon diberi nama subkon (SIG cmtsub), mis. "GREY (ARINDO)"
+    private function colorLabel($r): string
+    {
+        $color = (string) ($r->po_material ?: $r->material);
+        if ((int) ($r->cmt ?? 0) !== 1) {
+            return $color;
+        }
+        static $names = [];
+        $pk = (int) ($r->cmtsubpk ?? 0);
+        if ($pk <= 0) {
+            return $color . ' (SUBKON)';
+        }
+        if (!array_key_exists($pk, $names)) {
+            try {
+                $names[$pk] = DB::connection('mysql_sig')->table('cmtsub')->where('cmtsubpk', $pk)->value('subkon');
+            } catch (\Throwable $e) {
+                $names[$pk] = null;
+            }
+        }
+        return $color . ' (' . strtoupper($names[$pk] ?: 'SUBKON') . ')';
     }
 
     // ukuran master carton (carton_bundle); kalau belum diisi pakai ukuran inner box

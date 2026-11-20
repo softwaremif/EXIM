@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 //            (pack.exportpk = shipment ini & pack.contpk terisi)
 // - loaded = dari carton tsb, yang sudah discan masuk container di
 //            FG Stuffing (pack.status 6 = Stuffing, 7 = Shipment)
+// - locked = dari carton tsb, yang sudah terkunci shipment (pack.status 7,
+//            mis. lewat menu Set Complete Shipment)
 // 1 carton fisik dihitung 1x, grouping SAMA dengan API Packing:
 // Bundle via bundlepk, Mix via mixno, selain itu
 // carton + POno + OP + poref + part (1 PO bisa punya beberapa popk)
@@ -19,7 +21,7 @@ class StuffingProgress
 {
     /**
      * @param iterable $exportpks
-     * @return \Illuminate\Support\Collection exportpk => ['loaded' => int, 'total' => int]
+     * @return \Illuminate\Support\Collection exportpk => ['loaded' => int, 'total' => int, 'locked' => int]
      */
     public static function forExports($exportpks)
     {
@@ -33,7 +35,7 @@ class StuffingProgress
             ->leftJoin('po', 'po.popk', '=', 'pack.popk')
             ->whereIn('pack.exportpk', $exportpks->all())
             ->whereNotNull('pack.contpk')
-            ->selectRaw("DISTINCT pack.exportpk, (pack.status IN (6, 7)) AS stuffed,
+            ->selectRaw("DISTINCT pack.exportpk, (pack.status IN (6, 7)) AS stuffed, (pack.status = 7) AS locked,
                 COALESCE(
                     CONCAT('B', NULLIF(pack.bundlepk, 0)),
                     CONCAT('M', NULLIF(pack.mixno, '')),
@@ -49,6 +51,9 @@ class StuffingProgress
             return [$exportpk => [
                 'loaded' => $packs->where('stuffed', 1)->pluck('ctn_key')->unique()->count(),
                 'total'  => $packs->pluck('ctn_key')->unique()->count(),
+                // carton fisik dihitung terkunci kalau semua barisnya status 7
+                'locked' => $packs->pluck('ctn_key')->unique()->count()
+                    - $packs->where('locked', 0)->pluck('ctn_key')->unique()->count(),
             ]];
         });
     }

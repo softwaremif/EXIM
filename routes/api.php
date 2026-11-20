@@ -160,3 +160,5 @@ Route::post('/updateShipment', [ShipplanController::class, 'updateShipment']);
 
 
 Route::get('/getListShipment', [ShipplanController::class, 'getListShipment']);
+// Loading dock (Security Gate): container per MIF & dock -- dipakai layar TV stuffing Packing List
+Route::get('/dockBoard', [ShipplanController::class, 'dockBoard']);

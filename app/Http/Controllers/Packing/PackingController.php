@@ -123,7 +123,7 @@ class PackingController extends Controller
                 ->selectRaw("popk,
                     SUM(pcs)  AS packing_qty,
                     SUM(pcsp) AS packing_qty_plan,
-                    SUM(CASE WHEN status >= 4 THEN jmlpcs ELSE 0 END) AS packing_ctn,
+                    COUNT(DISTINCT CASE WHEN status >= 4 AND jmlpcs > 0 THEN CONCAT(popk, '|', carton, '|', COALESCE(part, 0)) END) AS packing_ctn,
                     GROUP_CONCAT(DISTINCT exportpk ORDER BY exportpk) AS exportpks")
                 ->whereIn('popk', $chunk)
                 ->groupBy('popk')

@@ -47,6 +47,19 @@
                 #modalCreateContainer .mc-close {
                     flex-shrink: 0;
                 }
+
+                /* tab Container Leave: data keluar dari security (baca saja) */
+                #modalCreateContainer .gate-leave-block { margin-top: 16px; }
+                /* grup foto berjajar ke samping (turun ke baris berikutnya kalau tidak muat) */
+                #modalCreateContainer [data-gate="media"] { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px 20px; }
+                #modalCreateContainer .gate-media-group { flex: none; min-width: 0; }
+                #modalCreateContainer .gate-media-group__title { font-size: 12px; font-weight: 600; color: #5f6b7a; margin-bottom: 6px; white-space: nowrap; }
+                #modalCreateContainer .gate-thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+                #modalCreateContainer .gate-thumbs a { display: block; width: 88px; height: 88px; border-radius: 8px; overflow: hidden; border: 1px solid #dfe3ea; background: #f4f6f9; }
+                #modalCreateContainer .gate-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+                #modalCreateContainer .gate-video { display: block; width: 157px; height: 88px; border-radius: 8px; background: #000; object-fit: cover; }
+                #modalCreateContainer .gate-media-group--video .gate-video:fullscreen { object-fit: contain; }
+                #modalCreateContainer .gate-empty { font-size: 13px; color: #8a94a3; }
             </style>
             <div class="mc-header">
                 <div class="mc-header-icon"><i class="bi bi-box-seam"></i></div>
@@ -148,7 +161,8 @@
                                 <label class="mc-label"><i class="bi bi-calendar-event"></i>Forwarder Close Time</label>
                                 <input class="easyui-datetimebox mc-input" style="width:250px;height:40px;"
                                     id="closetime" name="closetime"
-                                    data-options="formatter:myformatter2,parser:myparser2,editable: false">
+                                    data-options="formatter:myformatter2,parser:myparser2,editable:true,showSeconds:false">
+                                <div class="form-text">Ketik atau pilih: dd/mm/yyyy HH:mm, contoh 16/10/2026 14:30</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="mc-label"><i class="bi bi-person-lines-fill"></i> Forwarder</label>
@@ -172,6 +186,20 @@
                                 url:'{{ route('getPlb') }}',
                                 method:'get',
                                 prompt:'Pilih Port',
+                                panelHeight:'auto',
+                                panelMaxHeight:200
+                            ">
+                            </div>
+                            {{-- ekspedisi (tabel ekspedisi) -> cont.ekspedisipk, satu pilihan untuk semua container seperti forwarder --}}
+                            <div class="col-md-6">
+                                <label class="mc-label"><i class="bi bi-truck"></i> Ekspedisi</label>
+                                <input class="easyui-combobox fwd-combo mc-input" name="ekspedisi" id="ekspedisi"
+                                    style="width:250px;height:40px;" data-options="
+                                valueField:'ekspedisipk',
+                                textField:'ekspedisinm',
+                                url:'{{ route('getEkspedisi') }}',
+                                method:'get',
+                                prompt:'Pilih Ekspedisi',
                                 panelHeight:'auto',
                                 panelMaxHeight:200
                             ">
@@ -216,9 +244,11 @@
                             </div> --}}
 
                             <div class="mc-pane-toolbar mt-4">
+                                {{-- DITUTUP SEMENTARA: semua foto container sekarang dari security (menu Security Gate).
+                                     Teks lama: <i class="bi bi-camera-fill"></i> Upload foto kondisi tiap container --}}
                                 <div class="mc-pane-toolbar-text">
-                                    <i class="bi bi-camera-fill"></i>
-                                    Upload foto kondisi tiap container
+                                    <i class="bi bi-shield-check"></i>
+                                    Data container keluar dari security: jam keluar, dokumentasi &amp; dokumen
                                 </div>
                                 <span class="mc-count-pill" id="containerFotoCountPill">0 Container</span>
                             </div>
@@ -324,9 +354,11 @@
             <div class="col-md-6">
                 <label class="mc-label"><i class="bi bi-calendar-event"></i> Actual Container Arrival in Fty</label>
                 {{-- isi <template> tidak pernah ikut di-parse easyui saat DOM ready.
-                    widget-nya diinisialisasi manual di syncContainerArrivalTab() setelah kartu di-append. --}}
+                    widget-nya diinisialisasi manual di syncContainerArrivalTab() setelah kartu di-append.
+                    bisa diisi / diedit EXIM; juga diisi security saat gate in. Dikosongkan = jam tiba lama tetap. --}}
                     <input class="easyui-datetimebox mc-input" style="width:250px;height:40px;" data-field="actcontdate"
                         data-options="formatter:myformatter2,parser:myparser2">
+                <div class="form-text">Diisi EXIM atau otomatis oleh security saat gate in. Format dd/mm/yyyy HH:mm.</div>
             </div>
             <div class="col-md-6">
                 <label class="mc-label"><i class="bi bi-upc-scan"></i> No. Container</label>
@@ -335,7 +367,14 @@
 
             <div class="col-md-6">
                 <label class="mc-label"><i class="bi bi-truck"></i> No. Truck</label>
-                <input type="text" class="mc-input" data-field="nopol" placeholder="cth. AD 1111 PE">
+                {{-- diisi EXIM; security hanya melihat (acuan utama untuk LCL yang tidak punya no. container) --}}
+                <input type="text" class="mc-input" data-field="nopol" placeholder="cth. B 9123 KXT" maxlength="20" style="text-transform:uppercase">
+                <div class="form-text">Diisi EXIM, tampil di Security Gate. Untuk LCL dipakai sebagai acuan pengganti no. container.</div>
+            </div>
+
+            <div class="col-md-6">
+                <label class="mc-label"><i class="bi bi-upc-scan"></i> No. Seal</label>
+                <input type="text" class="mc-input" data-field="noseal" placeholder="cth. EMCXFC5984">
             </div>
         </div>
     </div>
@@ -351,13 +390,27 @@
             <span class="container-foto-vessel text-muted small"></span>
         </div>
 
+        {{-- data keluar dari security, diisi renderGateLeave() (baca saja, tidak ikut tersimpan) --}}
         <div class="row g-3">
             <div class="col-md-6">
-                <label class="mc-label"><i class="bi bi-upc-scan"></i> No. Seal</label>
-                <input type="text" class="mc-input" data-field="noseal" placeholder="cth. EMCXFC5984">
+                <label class="mc-label"><i class="bi bi-box-arrow-right"></i> Actual Container Exit Factory</label>
+                <input type="text" class="mc-input" data-gate="out_at" placeholder="Belum keluar" readonly>
+                <div class="form-text">Dicatat security saat container keluar.</div>
             </div>
         </div>
+        <div class="gate-leave-block">
+            <label class="mc-label"><i class="bi bi-images"></i> Dokumentasi selesai stuffing, segel &amp; container keluar</label>
+            <div data-gate="media"></div>
+        </div>
+        <div class="gate-leave-block">
+            <label class="mc-label"><i class="bi bi-file-earmark-text"></i> Dokumen</label>
+            <div class="d-flex flex-wrap gap-2" data-gate="docs"></div>
+        </div>
 
+        {{-- DITUTUP SEMENTARA: upload foto di EXIM disembunyikan karena semua foto container sekarang
+             diambil security (menu Security Gate). Markup & JS-nya tetap ada; hapus class d-none pada
+             .container-foto-closed untuk membukanya lagi. --}}
+        <div class="container-foto-closed d-none">
         {{-- diisi applyFotoLock(): alasan tombol foto disabled (carton belum semua masuk container) --}}
         <div class="container-foto-lock-note small text-danger mt-2 d-none"></div>
 
@@ -446,6 +499,7 @@
                 </button>
             </div>
         </div>
+        </div>{{-- /.container-foto-closed --}}
     </div>
 </template>
 

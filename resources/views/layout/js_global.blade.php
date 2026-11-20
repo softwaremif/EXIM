@@ -459,3 +459,5 @@
         bsToast.show();
     };
 </script>
+
+@include('layout.app_dialog')

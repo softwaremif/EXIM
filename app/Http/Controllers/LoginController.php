@@ -29,7 +29,7 @@ class LoginController extends Controller
             ->leftJoin('grup', 'grup.gruppk', '=', 'user.gruppk')
             ->where(['user.username' => $user])
             ->where(['user.password' => $pass])
-            ->where('userdt.webpk', 13)
+            ->whereIn('userdt.webpk', [13, 3])
             ->first();
 
         if (empty($users)) return response()->json(['success' => false, 'message' => "Informasi salah, silahkan coba lagi", 'route' => null], 400);
@@ -57,6 +57,8 @@ class LoginController extends Controller
                 // } else {
                     if ($users->guserpk == 42 || $users->guserpk == 44 || $users->guserpk == 45) {
                         $url = "exim-export/shipplan/index";
+                    } elseif ($users->guserpk == 46) {
+                        $url = "security/gate";
                     } else {
                         $url = "order";
                     }

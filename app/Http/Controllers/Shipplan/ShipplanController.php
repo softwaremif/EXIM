@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Shipplan;
 use App\Exports\ShipmentPackingListExport;
 use App\Exports\ShipmentPlanExport;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Security\GateController;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Session;
 use App\Models\Container;
 use App\Models\Export;
@@ -162,10 +164,139 @@ class ShipplanController extends Controller
         $progress = StuffingProgress::forExports($rows->pluck('exportpk'));
 
         foreach ($rows as $row) {
-            $p = $progress->get((int) $row->exportpk, ['loaded' => 0, 'total' => 0]);
+            $p = $progress->get((int) $row->exportpk, ['loaded' => 0, 'total' => 0, 'locked' => 0]);
             $row->ctn_loaded = $p['loaded'];
             $row->ctn_total = $p['total'];
+            $row->ctn_locked = $p['locked'];
         }
+    }
+
+    /**
+     * Set Complete Shipment (menu titik tiga di list): hanya kalau semua carton shipment sudah masuk
+     * container (stuffing 100%).
+     *  1. Packing (lewat API /api/packing/complete-shipment): pack.status 6 -> 7, po.sts = 1 kalau part
+     *     terakhir popk = 10.
+     *  2. EXIM: semua container shipment ditandai selesai & tersegel (cont.start_ship / end_ship / segel),
+     *     karena status list "Complete" (is_segel), status container "Shipped" dan kunci kartu container
+     *     di detail_ship dihitung dari kolom ini. Jam diambil dari jam tutup container Security Gate
+     *     (gate_close_at) kalau ada, selain itu saat ini; nilai yang sudah terisi tidak diubah.
+     * Bisa dijalankan ulang (mis. data container belum ikut ter-update): carton yang sudah status 7 dilewati.
+     */
+    public function completeShipment(Request $request)
+    {
+        $v = $request->validate(['exportpk' => 'required|integer']);
+        $exportpk = (int) $v['exportpk'];
+
+        $export = DB::table('export')->where('exportpk', $exportpk)->first(['exportpk', 'stscancel']);
+        if (!$export) {
+            return response()->json(['message' => 'Shipment plan tidak ditemukan.'], 404);
+        }
+        if ((int) $export->stscancel === 1) {
+            return response()->json(['message' => 'Shipment plan ini sudah dibatalkan.'], 422);
+        }
+
+        $p = StuffingProgress::forExports([$exportpk])->get($exportpk, ['loaded' => 0, 'total' => 0, 'locked' => 0]);
+        if ($p['total'] === 0 || $p['loaded'] < $p['total']) {
+            return response()->json([
+                'message' => "Belum bisa complete: carton baru {$p['loaded']} dari {$p['total']} yang masuk container.",
+            ], 422);
+        }
+
+        // container yang ditolak security harus diganti dulu (tidak boleh ditandai shipped)
+        $contCols = Schema::getColumnListing('cont');
+        if (in_array('gate_result', $contCols, true)
+            && DB::table('cont')->where('exportpk', $exportpk)->whereNotNull('actcontdate')->where('gate_result', 0)->exists()) {
+            return response()->json([
+                'message' => 'Masih ada container yang ditolak security. Ganti container tersebut dulu sebelum complete shipment.',
+            ], 422);
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(60)
+                ->post($this->packingBaseUrl() . '/api/packing/complete-shipment', [
+                    'exportpk' => $exportpk,
+                    'user'     => (string) Session::get('login'), // dicatat di log aktivitas Packing List
+                ]);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['message' => 'Sistem Packing tidak dapat terhubung. Shipment belum di-complete.'], 502);
+        }
+
+        $body = $response->json() ?? [];
+        if (!$response->successful()) {
+            return response()->json(['message' => $body['message'] ?? 'Gagal set complete shipment.'], $response->status());
+        }
+
+        // container EXIM: selesai muat & tersegel (status list Complete, container Shipped, kartu terkunci)
+        $closeCol = in_array('gate_close_at', $contCols, true) ? 'gate_close_at' : null;
+        $sealed = 0;
+        foreach (DB::table('cont')->where('exportpk', $exportpk)->get() as $c) {
+            $at = ($closeCol && !empty($c->{$closeCol})) ? $c->{$closeCol} : now();
+            $set = array_filter([
+                'start_ship' => empty($c->start_ship) ? $at : null,
+                'end_ship'   => empty($c->end_ship) ? $at : null,
+                'segel'      => empty($c->segel) ? $at : null,
+            ]);
+            if ($set) {
+                DB::table('cont')->where('contpk', $c->contpk)->update($set);
+                $sealed++;
+            }
+        }
+
+        $body['containers'] = $sealed;
+        $body['message'] = trim(($body['message'] ?? 'Shipment complete.') . ($sealed ? " {$sealed} container ditandai shipped." : ''));
+
+        return response()->json($body);
+    }
+
+    /**
+     * Uncomplete Shipment (menu titik tiga di list): barang yang sudah dikirim dikembalikan. Kebalikan completeShipment:
+     *  1. Packing (lewat API /api/packing/uncomplete-shipment): pack.status 7 -> 6, po.sts 1 -> 0 (popk part terakhir 10).
+     *  2. EXIM: segel & selesai muat container dikosongkan (cont.end_ship, cont.segel) -> status list kembali dari
+     *     Complete, container kembali "Start Loading" dan kartunya bisa diubah lagi. Jam mulai muat (start_ship) tetap.
+     * Ditolak kalau shipment sudah di-Lock Shipment (sudah diposting ke database LPB).
+     */
+    public function uncompleteShipment(Request $request)
+    {
+        $v = $request->validate(['exportpk' => 'required|integer']);
+        $exportpk = (int) $v['exportpk'];
+
+        $export = DB::table('export')->where('exportpk', $exportpk)->first(['exportpk', 'stscancel', 'lockship']);
+        if (!$export) {
+            return response()->json(['message' => 'Shipment plan tidak ditemukan.'], 404);
+        }
+        if ((int) $export->stscancel === 1) {
+            return response()->json(['message' => 'Shipment plan ini sudah dibatalkan.'], 422);
+        }
+        if ((int) $export->lockship === 1) {
+            return response()->json(['message' => 'Shipment sudah di-Lock Shipment (data sudah diposting ke database LPB), tidak bisa di-uncomplete.'], 422);
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(60)
+                ->post($this->packingBaseUrl() . '/api/packing/uncomplete-shipment', [
+                    'exportpk' => $exportpk,
+                    'user'     => (string) Session::get('login'), // dicatat di log aktivitas Packing List
+                ]);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['message' => 'Sistem Packing tidak dapat terhubung. Shipment belum di-uncomplete.'], 502);
+        }
+
+        $body = $response->json() ?? [];
+        if (!$response->successful()) {
+            return response()->json(['message' => $body['message'] ?? 'Gagal uncomplete shipment.'], $response->status());
+        }
+
+        $opened = DB::table('cont')
+            ->where('exportpk', $exportpk)
+            ->where(fn($q) => $q->whereNotNull('segel')->orWhereNotNull('end_ship'))
+            ->update(['segel' => null, 'end_ship' => null]);
+
+        $body['containers'] = $opened;
+        $body['message'] = trim(($body['message'] ?? 'Shipment uncomplete.') . ($opened ? " {$opened} container dibuka kembali." : ''));
+
+        return response()->json($body);
     }
 
     // private function addOrderImageToRows($rows): void
@@ -529,9 +660,16 @@ class ShipplanController extends Controller
             ->where('cont.exportpk', $exportpk)
             ->get();
 
+        // riwayat container yang ditolak security lalu diganti (lihat replaceContainer)
+        $gateHistory = Schema::hasTable(GateController::HISTORY_TABLE)
+            ? DB::table(GateController::HISTORY_TABLE)->whereIn('contpk', $container->pluck('contpk'))->orderBy('histpk')->get()->groupBy('contpk')
+            : collect();
+
         $loadedCartons = collect();
 
         foreach ($container as $c) {
+            $c->is_rejected = !empty($c->actcontdate) && isset($c->gate_result) && (int) $c->gate_result === 0;
+            $c->gate_history = $gateHistory->get($c->contpk, collect());
 
             $cartonsForThisContainer = $this->getLoadedCartonsFromPacking(
                 (int) $exportpk,
@@ -556,7 +694,10 @@ class ShipplanController extends Controller
 
         return view(
             'menu.exim-export.shipplan.detail_ship',
-            compact('header', 'container', 'exportpk', 'loadedCartons', 'total')
+            compact('header', 'container', 'exportpk', 'loadedCartons', 'total') + [
+                // mode lihat saja kalau shipment dibuat grup lain (kecuali Manager EXIM), lihat ShipplanAccess
+                'canEdit' => \App\Services\ShipplanAccess::canEdit($exportpk),
+            ]
         );
     }
 
@@ -565,7 +706,7 @@ class ShipplanController extends Controller
         //  query LANGSUNG ke mysql_andon
         // (database Packing). SEKARANG delegasikan ke API Packing.
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(15)
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(15)
                 ->get($this->packingBaseUrl() . '/api/packing/container-summary', [
                     'exportpk' => $exportpk,
                     'contpk'   => $contpk,
@@ -773,6 +914,24 @@ class ShipplanController extends Controller
         $data = DB::table('fwd')
             ->select('fwdpk', 'fwdnm')
             ->orderBy('fwdnm', 'ASC')
+            ->get();
+
+        return response()->json($data);
+    }
+
+    // kolom cont.ekspedisipk opsional (belum ada di semua database): baca & simpan hanya kalau sudah dibuat
+    private function ekspedisiReady(): bool
+    {
+        static $ready = null;
+        return $ready ?? ($ready = Schema::hasColumn('cont', 'ekspedisipk'));
+    }
+
+    // pilihan ekspedisi (truk / angkutan) di modal edit shipment plan; disimpan ke cont.ekspedisipk
+    public function getEkspedisi()
+    {
+        $data = DB::table('ekspedisi')
+            ->select('ekspedisipk', 'ekspedisinm')
+            ->orderBy('ekspedisinm', 'ASC')
             ->get();
 
         return response()->json($data);
@@ -1075,17 +1234,30 @@ class ShipplanController extends Controller
             $payload = [
                 'exportpk'      => $data['exportpk'],
                 'contno'        => $c['contno'] ?? null,
-                'nopol'         => $c['nopol'] ?? null,
+                // no. truck diisi EXIM (security hanya melihat): huruf kapital, spasi tunggal
+                'nopol'         => isset($c['nopol']) && trim($c['nopol']) !== '' ? strtoupper(preg_replace('/\s+/', ' ', trim($c['nopol']))) : null,
                 'noseal'        => $c['noseal'] ?? null,
                 'actcontdate'   => $actcontdate,
                 'fwdpk'         => $c['fwd'] ?? $data['fwd'] ?? null,
+
                 'vessname'      => $c['vessname'] ?? null,
                 'remark'        => null,
             ];
 
+            // ekspedisi dipilih di modal (sama untuk semua container shipment, seperti forwarder)
+            if ($this->ekspedisiReady()) {
+                $payload['ekspedisipk'] = ($c['ekspedisi'] ?? $data['ekspedisi'] ?? null) ?: null;
+            }
+
             if (!empty($type)) {
                 $payload['type']   = $type;
                 $payload['volume'] = $cbm;
+            }
+
+            // jam tiba bisa diisi / diedit EXIM di modal (juga diisi security saat gate in);
+            // dikosongkan di modal = jam tiba yang sudah ada tetap (data gate in security tidak terhapus)
+            if (!empty($c['contpk']) && empty($payload['actcontdate'])) {
+                unset($payload['actcontdate']);
             }
 
             // ================= HANDLE UPLOAD FOTO (5 SLOT) =================
@@ -1213,6 +1385,84 @@ class ShipplanController extends Controller
         }
 
         Container::whereIn('contpk', $removed->pluck('contpk'))->delete();
+    }
+
+    /**
+     * Ganti container yang ditolak security (cont.gate_result = 0).
+     * Carton yang sudah dimuat dikeluarkan dulu (kembali belum dimuat).
+     * Data pemeriksaan container lama dipindah ke cont_gate_history, lalu baris cont
+     * yang sama dikosongkan untuk container pengganti. contpk tidak berubah, jadi
+     * packing, stuffing, SI/CLP, dan notifikasi tetap memakai baris yang sama.
+     * Tipe, volume, forwarder & vessel dipertahankan; security memeriksa ulang saat tiba.
+     */
+    public function replaceContainer(Request $request, $contpk)
+    {
+        $v = $request->validate(['contno' => 'nullable|string|max:100']);
+
+        $cont = DB::table('cont')->where('contpk', (int) $contpk)->first();
+        if (!$cont) {
+            return response()->json(['success' => false, 'message' => 'Container tidak ditemukan.'], 404);
+        }
+        if (!isset($cont->gate_result) || (int) $cont->gate_result !== 0) {
+            return response()->json(['success' => false, 'message' => 'Hanya container yang ditolak security yang bisa diganti.'], 422);
+        }
+        if (!Schema::hasTable(GateController::HISTORY_TABLE)) {
+            return response()->json(['success' => false, 'message' => 'Tabel ' . GateController::HISTORY_TABLE . ' belum dibuat. Hubungi IT.'], 503);
+        }
+        // carton yang sudah dimuat ke container lama dikeluarkan dulu lewat API Packing
+        // (pack.exportpk, contpk, part -> null), sama seperti tombol "Keluarkan semua carton".
+        // Carton status >= 6 (shipped/tersegel) tidak boleh dikeluarkan, sama seperti di UI.
+        $packs = DB::connection('mysql_andon')->table('pack')->where('contpk', $cont->contpk)->get(['packpk', 'status']);
+        if ($packs->contains(fn($p) => (int) $p->status >= 6)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ada carton di container ini yang sudah berstatus shipped, jadi tidak bisa dikeluarkan otomatis. Periksa data container ini dulu.',
+            ], 422);
+        }
+        $unloadMessage = '';
+        if ($packs->isNotEmpty()) {
+            $unload = $this->callUnloadApi([
+                'packpk'   => $packs->pluck('packpk')->map(fn($v) => (int) $v)->all(),
+                'exportpk' => (int) $cont->exportpk,
+                'contpk'   => (int) $cont->contpk,
+            ]);
+            $unloadBody = $unload->getData(true);
+            if (!$unload->isSuccessful() || ($unloadBody['success'] ?? true) === false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Carton gagal dikeluarkan dari container lama: ' . ($unloadBody['message'] ?? 'Sistem Packing error.') . ' Container belum diganti.',
+                ], $unload->isSuccessful() ? 500 : $unload->status());
+            }
+            $unloadMessage = ($unloadBody['message'] ?? '') . ' ';
+        }
+
+        $gateCols = GateController::GATE_COLUMNS;
+        // tanda tangan & data muat ikut diarsipkan kalau kolomnya sudah ada di kedua table
+        $histCols = Schema::getColumnListing(GateController::HISTORY_TABLE);
+        $contCols = Schema::getColumnListing('cont');
+        foreach (array_merge([GateController::SIGN_COLUMN, GateController::IN_GUARDS_COLUMN], GateController::STUFF_COLUMNS) as $col) {
+            if (in_array($col, $contCols, true) && in_array($col, $histCols, true)) {
+                $gateCols[] = $col;
+            }
+        }
+        $history = ['replaced_at' => now(), 'replaced_userpk' => Session::get('userpk')];
+        foreach (array_merge(['contpk', 'exportpk', 'contno', 'type', 'nopol', 'noseal', 'actcontdate'], $gateCols) as $col) {
+            $history[$col] = $cont->{$col} ?? null;
+        }
+        // jejak edit hanya ada di cont (tidak diarsipkan), tetap dikosongkan untuk container pengganti
+        $editCols = array_values(array_intersect(GateController::EDIT_COLUMNS, $contCols));
+        $reset = array_fill_keys(array_merge(['nopol', 'noseal', 'actcontdate'], $gateCols, $editCols), null);
+        $reset['contno'] = !empty($v['contno']) ? strtoupper(preg_replace('/\s+/', '', $v['contno'])) : null;
+
+        DB::transaction(function () use ($cont, $history, $reset) {
+            DB::table(GateController::HISTORY_TABLE)->insert($history);
+            DB::table('cont')->where('contpk', $cont->contpk)->update($reset);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Container diganti. ' . $unloadMessage . 'Security akan memeriksa container pengganti saat tiba.',
+        ]);
     }
 
     // public function available_cartons($exportpk, $contpk)
@@ -1455,7 +1705,7 @@ class ShipplanController extends Controller
         // Packing yang mengerjakan query & grouping-nya sendiri di
         // database-nya sendiri.
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(15)
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(15)
                 ->get($this->packingBaseUrl() . '/api/packing/available-cartons', [
                     'popks'        => $popks->implode(','),
                     'exportpk'     => $exportpk,
@@ -1518,8 +1768,15 @@ class ShipplanController extends Controller
             'packpk.*' => 'integer',
         ]);
 
+        $cont = DB::table('cont')->where('contpk', $validated['contpk'])->first();
+        if ($cont && isset($cont->gate_result) && (int) $cont->gate_result === 0) {
+            return response()->json([
+                'message' => 'Container ini ditolak security dan tidak boleh dimuat. Ganti container terlebih dahulu.',
+            ], 422);
+        }
+
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(60) //  
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(60) //
                 ->post($this->packingBaseUrl() . '/api/packing/load-carton-to-container', [
                     'contpk'   => $validated['contpk'],
                     'exportpk' => $validated['exportpk'],
@@ -1858,7 +2115,7 @@ class ShipplanController extends Controller
     private function getLoadedCartonsFromPacking(int $exportpk, int $contpk)
     {
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(10)
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(10)
                 ->get($this->packingBaseUrl() . '/api/packing/loaded-cartons-by-container', [
                     'exportpk' => $exportpk,
                     'contpk'   => $contpk,
@@ -1897,7 +2154,7 @@ class ShipplanController extends Controller
     private function callUnloadApi(array $validated)
     {
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(60) //  
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(60) //  
                 ->post($this->packingBaseUrl() . '/api/packing/unload-carton-from-container', $validated);
 
             //  FIX UTAMA (OPTIMASI): decode JSON SEKALI SAJA, dipakai
@@ -1936,6 +2193,39 @@ class ShipplanController extends Controller
         }
     }
 
+    /**
+     * Data tab Container Leave di modal shipment plan (baca saja, diisi security):
+     * jam keluar, foto & video dokumentasi keluar, dan link dokumen cetak.
+     */
+    private function gateLeaveInfo($c): array
+    {
+        $url = fn($f) => is_string($f) && $f !== '' ? asset('public/upload/gate/' . (int) $c->contpk . '/' . $f) : null;
+        $raw = json_decode($c->{GateController::OUT_MEDIA_COLUMN} ?? '[]', true) ?: [];
+        $media = [];
+        foreach (GateController::OUT_PHOTO_KINDS as $kind => [$label]) {
+            $media[] = ['label' => $label, 'urls' => array_values(array_filter(array_map($url, (array) ($raw[$kind] ?? []))))];
+        }
+
+        $rejected = isset($c->gate_result) && (int) $c->gate_result === 0;
+        $docs = [];
+        if (!empty($c->actcontdate)) {
+            $docs[] = ['label' => 'Checklist pemeriksaan container', 'url' => route('container.doc', [$c->contpk, 'checklist'])];
+            if (!$rejected) {
+                $docs[] = ['label' => 'Berita acara stuffing', 'url' => route('container.doc', [$c->contpk, 'stuffing'])];
+                $docs[] = ['label' => 'Dokumen pengiriman barang', 'url' => route('container.doc', [$c->contpk, 'pengiriman'])];
+            }
+        }
+
+        return [
+            'out_at'   => !empty($c->gate_out_at) ? Carbon::parse($c->gate_out_at)->format('d/m/Y H:i') : null,
+            'arrived'  => !empty($c->actcontdate),
+            'rejected' => $rejected,
+            'media'    => $media,
+            'video'    => $url($raw['out_video'] ?? null),
+            'docs'     => $docs,
+        ];
+    }
+
     public function detail_json($exportpk)
     {
         $export = DB::table('export')->where('exportpk', $exportpk)->first();
@@ -1944,9 +2234,12 @@ class ShipplanController extends Controller
             return response()->json(['message' => 'Data tidak ditemukan'], 404);
         }
 
+        // data keluar dari security (tab Container Leave), hanya kolom yang sudah ada
+        $gateCols = array_values(array_intersect(['gate_out_at', 'gate_result', GateController::OUT_MEDIA_COLUMN], Schema::getColumnListing('cont')));
+
         $containers = DB::table('cont')
             ->where('exportpk', $exportpk)
-            ->select(
+            ->select(array_merge([
                 'contpk',
                 'contno',
                 'type',
@@ -1962,10 +2255,12 @@ class ShipplanController extends Controller
                 'end_ship',
                 'nopol',
                 'noseal',
-                'actcontdate'
-            )
+                'actcontdate',
+            ], $gateCols, $this->ekspedisiReady() ? ['ekspedisipk'] : []))
             ->get()
             ->map(function ($c) {
+                $c->gate = $this->gateLeaveInfo($c);
+
                 // dikirim sebagai map slot -> url, supaya JS modal bisa merestore tiap slot foto
                 $fotoUrls = [];
 
@@ -1991,6 +2286,7 @@ class ShipplanController extends Controller
             'nobook'      => $export->nobook,
             'vassalpk'   => $export->vassalpk,
             'fwdpk'      => $containers->first()->fwdpk ?? null,
+            'ekspedisipk' => $containers->first()->ekspedisipk ?? null,
             'etdvess'    => $export->etdvess,
             'etavess'    => $export->etavess,
             'totqty'    => $export->totqty,
@@ -2175,7 +2471,7 @@ class ShipplanController extends Controller
         // mysql_andon (database Packing). SEKARANG delegasikan ke API
         // Packing, SAMA pola dengan available_cartons()/load_container().
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(15)
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(15)
                 ->get($this->packingBaseUrl() . "/api/packing/container-progress/{$contpk}");
 
             if (!$response->successful()) {
@@ -2283,7 +2579,17 @@ class ShipplanController extends Controller
                     THEN 1
                     ELSE 0
                 END AS is_segel
-            ")
+            "),
+                // Cont Leave: semua container shipment sudah tercatat keluar pabrik oleh Security (gate out)
+                DB::raw("
+               CASE
+                    WHEN COUNT(cont.contpk) > 0
+                        AND COUNT(cont.gate_out_at) = COUNT(cont.contpk)
+                    THEN 1
+                    ELSE 0
+                END AS is_leave
+            "),
+                DB::raw('MAX(cont.gate_out_at) AS leave_at')
             )
             ->selectRaw("COALESCE(NULLIF(poexport.pebno, ''), export.pebno) AS pebno")
             ->groupBy('poexport.poexportpk');
@@ -2362,6 +2668,15 @@ class ShipplanController extends Controller
         } elseif ($status == 4) {
             // CANCEL SHIPMENT
             $query->where('export.stscancel', 1);
+        } elseif ($status == 5) {
+            // CONT LEAVE: semua container sudah keluar pabrik, tapi shipment belum di-Set Complete
+            $query->having('is_leave', '=', 1)
+                ->having('is_segel', '=', 0)
+                ->where($notCancelled);
+        } elseif ($request->input('show_cancel') === '0') {
+            // checkbox "Tampilkan cancel" di toolbar tidak dicentang: shipment cancel disembunyikan
+            // (tanpa parameter = semua tampil, seperti sebelumnya)
+            $query->where($notCancelled);
         }
 
         // filter Ex-Factory -> kolom Buyer Ex-Factory (export.GAC)
@@ -2519,6 +2834,11 @@ class ShipplanController extends Controller
             return 'Complete';
         }
 
+        // container sudah keluar pabrik tapi shipment belum di-Set Complete
+        if (!empty($row->is_leave)) {
+            return 'Cont Leave';
+        }
+
         if (!empty($row->exdate) && empty($row->actexdate)) {
             return 'Confirm';
         }
@@ -2562,8 +2882,96 @@ class ShipplanController extends Controller
         return Excel::download(new ShipmentPlanExport($result), $filename);
     }
 
+    /**
+     * Riwayat download Shipping Instruction per PO / OP (tanda "sudah masuk SI" di modal pilih PO / OP).
+     * 1 download = 1 batch (SI ke-n). Tabel opsional; selama belum dibuat, SI tetap bisa di-download tanpa riwayat:
+     *   CREATE TABLE export_si_log (
+     *       silogpk    INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     *       exportpk   INT NOT NULL,
+     *       batch      INT NOT NULL,              -- SI ke-n untuk shipment ini
+     *       POno       VARCHAR(100) NULL,
+     *       OP         VARCHAR(100) NULL,
+     *       userpk     INT NULL,
+     *       login      VARCHAR(50) NULL,
+     *       created_at DATETIME NOT NULL,
+     *       KEY idx_export_si_log_exportpk (exportpk)
+     *   );
+     */
+    private const SI_LOG_TABLE = 'export_si_log';
+
+    private function siLogReady(): bool
+    {
+        static $ready = null;
+        return $ready ?? ($ready = Schema::hasTable(self::SI_LOG_TABLE));
+    }
+
+    /**
+     * GET /export/si/{exportpk}/options
+     * PO / OP yang bisa dimasukkan ke Shipping Instruction (dari carton di pack) + riwayat SI yang sudah di-download.
+     */
+    public function siOptions($exportpk)
+    {
+        $export = DB::table('export')->where('exportpk', $exportpk)->first(['exportpk', 'buyer']);
+        if (!$export) {
+            return response()->json(['success' => false, 'message' => 'Shipment plan tidak ditemukan.'], 404);
+        }
+
+        $packRows = DB::connection('mysql_andon')->table('pack')->where('exportpk', $exportpk)
+            ->get(['POno', 'OP', 'popk', 'carton', 'bundlepk', 'pcsp', 'contpk']);
+        $styles = DB::connection('mysql_andon')->table('po')
+            ->whereIn('popk', $packRows->pluck('popk')->filter()->unique()->values())
+            ->pluck('style', 'popk');
+
+        $items = $packRows->groupBy(fn($r) => ($r->POno ?? '') . '|' . ($r->OP ?? ''))
+            ->map(function ($rows, $key) use ($styles) {
+                $first = $rows->first();
+                return [
+                    'key'     => $key,
+                    'POno'    => $first->POno ?: '-',
+                    'OP'      => $first->OP ?: '-',
+                    'style'   => $styles[$first->popk] ?? '-',
+                    'cartons' => $rows->whereNull('bundlepk')->pluck('carton')->unique()->count()
+                        + $rows->whereNotNull('bundlepk')->pluck('bundlepk')->unique()->count(),
+                    'pcs'     => (int) $rows->sum('pcsp'),
+                    'loaded'  => $rows->whereNotNull('contpk')->count(),
+                    'total'   => $rows->count(),
+                ];
+            })->values();
+
+        // PO di shipment ini yang belum punya carton: tampil tapi tidak bisa dipilih
+        $have = $items->pluck('key')->flip();
+        $noCarton = DB::table('poexport')->where('exportpk', $exportpk)->orderBy('poexportpk')->get(['POno', 'OP'])
+            ->filter(fn($r) => !isset($have[($r->POno ?? '') . '|' . ($r->OP ?? '')]))
+            ->map(fn($r) => ['key' => ($r->POno ?? '') . '|' . ($r->OP ?? ''), 'POno' => $r->POno ?: '-', 'OP' => $r->OP ?: '-'])
+            ->unique('key')->values();
+
+        // riwayat: batch => {no, at, login, keys[]}
+        $batches = [];
+        if ($this->siLogReady()) {
+            foreach (DB::table(self::SI_LOG_TABLE)->where('exportpk', $exportpk)->orderBy('batch')->orderBy('silogpk')->get() as $l) {
+                $b = &$batches[$l->batch];
+                $b = $b ?? ['no' => (int) $l->batch, 'at' => Carbon::parse($l->created_at)->format('d/m/Y H:i'), 'login' => $l->login, 'keys' => []];
+                $b['keys'][] = ($l->POno ?? '') . '|' . ($l->OP ?? '');
+                unset($b);
+            }
+        }
+
+        return response()->json([
+            'success'   => true,
+            'idship'    => 'SP' . str_pad($export->exportpk, 4, '0', STR_PAD_LEFT),
+            'buyer'     => implode(', ', $this->buyerList($export->buyer)),
+            'tracking'  => $this->siLogReady(),
+            'items'     => $items,
+            'noCarton'  => $noCarton,
+            'batches'   => array_values($batches),
+        ]);
+    }
+
     public function exportSI(Request $request, $exportpk)
     {
+        // PO / OP yang dipilih di modal (po[] = "POno|OP"); kosong = semua PO / OP shipment
+        $picked = collect((array) $request->input('po', []))->map(fn($k) => (string) $k)->filter(fn($k) => $k !== '')->unique()->values();
+
         $export = DB::table('export')
             ->leftJoin('vassal', 'vassal.vassalpk', '=', 'export.vassalpk')
             ->where('export.exportpk', $exportpk)
@@ -2605,6 +3013,19 @@ class ShipplanController extends Controller
             ->where('exportpk', $exportpk)
             ->get();
 
+        if ($picked->isNotEmpty()) {
+            $pickedSet = $picked->flip();
+            $packRows = $packRows->filter(fn($r) => isset($pickedSet[($r->POno ?? '') . '|' . ($r->OP ?? '')]))->values();
+            if ($packRows->isEmpty()) {
+                abort(422, 'PO / OP yang dipilih belum punya carton di shipment ini.');
+            }
+            // container hanya yang berisi carton PO / OP terpilih (kalau carton-nya sudah di-load)
+            $usedConts = $packRows->pluck('contpk')->filter()->unique();
+            if ($usedConts->isNotEmpty()) {
+                $conts = $conts->whereIn('contpk', $usedConts->all())->values();
+            }
+        }
+
         // Style & deskripsi (silhouette) per PO diambil dari table po
         // (mysql_andon) - popk dari pack.
         $popkList = $packRows->pluck('popk')->filter()->unique()->values();
@@ -2643,9 +3064,13 @@ class ShipplanController extends Controller
         // dihitung per nomor carton unik; carton BUNDLE dihitung 1 per
         // bundlepk (beberapa carton kecil = 1 carton fisik besar).
         // =========================================================
+        // GW/NW/CBM tersimpan per carton & diulang di tiap baris pack carton itu (carton ratio,
+        // carton mix, carton CMT MIF + subkon) -> dijumlah 1x per carton fisik, bukan per baris.
+        $physKey = fn($r) => !empty($r->mixno) ? 'M|' . $r->mixno . '|' . $r->carton
+            : 'C|' . ($r->POno ?? '') . '|' . ($r->OP ?? '') . '|' . ($r->poref ?? '') . '|' . $r->carton . '|' . ($r->part ?? 0);
         $groups = $packRows->groupBy(function ($row) {
             return ($row->POno ?? '') . '|' . ($row->OP ?? '');
-        })->map(function ($rows) use ($poMap, $cbmOf) {
+        })->map(function ($rows) use ($poMap, $cbmOf, $physKey) {
             $nonBundleCartons = $rows->whereNull('bundlepk')->pluck('carton')->unique();
             $bundleCount = $rows->whereNotNull('bundlepk')->pluck('bundlepk')->unique()->count();
 
@@ -2659,15 +3084,16 @@ class ShipplanController extends Controller
                 'descr' => strtoupper($po->silhouette ?? '-'),
                 'cartons' => $nonBundleCartons->count() + $bundleCount,
                 'pcs' => (int) $rows->sum('pcsp'),
-                'cbm' => (float) $rows->sum($cbmOf),
+                'cbm' => (float) $rows->unique($physKey)->sum($cbmOf),
             ];
         })->values();
 
         $totalCartons = $groups->sum('cartons');
         $totalPcs = $groups->sum('pcs');
-        $totalGw = (float) $packRows->sum('gw');
-        $totalNw = (float) $packRows->sum('nw');
-        $totalCbm = (float) $packRows->sum($cbmOf);
+        $physRows = $packRows->unique($physKey);
+        $totalGw = (float) $physRows->sum('gw');
+        $totalNw = (float) $physRows->sum('nw');
+        $totalCbm = (float) $physRows->sum($cbmOf);
 
         // =========================================================
         // No SI - format 0018/SI/I/2026 (no urut / SI / bulan romawi / tahun)
@@ -2986,6 +3412,21 @@ class ShipplanController extends Controller
         $writer = IOFactory::createWriter($spreadsheet, 'Xlsx');
         $writer->save($tempPath);
 
+        // riwayat download SI per PO / OP (lihat SI_LOG_TABLE)
+        if ($this->siLogReady()) {
+            $batch = (int) DB::table(self::SI_LOG_TABLE)->where('exportpk', $exportpk)->max('batch') + 1;
+            $now = now();
+            DB::table(self::SI_LOG_TABLE)->insert($groups->map(fn($g) => [
+                'exportpk'   => (int) $exportpk,
+                'batch'      => $batch,
+                'POno'       => $g['POno'] === '-' ? null : $g['POno'],
+                'OP'         => $g['OP'] === '-' ? null : $g['OP'],
+                'userpk'     => Session::get('userpk'),
+                'login'      => Session::get('login'),
+                'created_at' => $now,
+            ])->all());
+        }
+
         return response()->download($tempPath, $filename)->deleteFileAfterSend(true);
     }
 
@@ -3012,7 +3453,7 @@ class ShipplanController extends Controller
         $cartonsByCont = [];
         foreach ($conts as $c) {
             try {
-                $response = \Illuminate\Support\Facades\Http::timeout(30)
+                $response = \Illuminate\Support\Facades\Http::packing()->timeout(30)
                     ->get($this->packingBaseUrl() . '/api/packing/loaded-cartons-by-container', [
                         'exportpk' => $exportpk,
                         'contpk'   => $c->contpk,
@@ -3046,7 +3487,7 @@ class ShipplanController extends Controller
             $weightMap = $weightMap->union(
                 DB::connection('mysql_andon')->table('pack')
                     ->whereIn('packpk', $chunk->all())
-                    ->get(['packpk', 'gw', 'nw'])
+                    ->get(['packpk', 'popk', 'carton', 'part', 'mixno', 'gw', 'nw'])
                     ->keyBy('packpk')
             );
         }
@@ -3090,9 +3531,17 @@ class ShipplanController extends Controller
                 $lines[$key]['ctns']++;
                 $lines[$key]['cbm'] += (float) ($ctn['t_cbm'] ?? 0);
 
+                // berat tersimpan per carton & diulang di tiap baris pack carton yang sama
+                // (ratio / mix / CMT MIF + subkon) -> 1x per carton fisik (carton kecil bundle tetap masing-masing)
+                $seenWeight = [];
                 foreach ($ctn['packpks'] ?? [] as $packpk) {
-                    $lines[$key]['gw'] += (float) ($weightMap->get($packpk)->gw ?? 0);
-                    $lines[$key]['nw'] += (float) ($weightMap->get($packpk)->nw ?? 0);
+                    $w = $weightMap->get($packpk);
+                    if (!$w) continue;
+                    $wk = !empty($w->mixno) ? 'M|' . $w->mixno . '|' . $w->carton : 'C|' . $w->popk . '|' . $w->carton . '|' . ($w->part ?? 0);
+                    if (isset($seenWeight[$wk])) continue;
+                    $seenWeight[$wk] = true;
+                    $lines[$key]['gw'] += (float) ($w->gw ?? 0);
+                    $lines[$key]['nw'] += (float) ($w->nw ?? 0);
                 }
 
                 if (!empty($ctn['is_bundle'])) {
@@ -3435,6 +3884,240 @@ class ShipplanController extends Controller
         });
     }
 
+    /**
+     * GET /export/{exportpk}/merge-candidates?q=
+     * Shipment plan lain yang bisa digabung ke shipment ini (tujuan). Yang tidak bisa tetap tampil dengan alasannya:
+     * sudah di-cancel / lock tidak ditampilkan; carton sudah Complete Shipment (pack.status 7) atau
+     * container sudah keluar pabrik (cont.gate_out_at) ditolak.
+     */
+    public function mergeCandidates(Request $request, $exportpk)
+    {
+        $target = DB::table('export')->where('exportpk', $exportpk)->first(['exportpk', 'buyer', 'stscancel', 'lockship']);
+        if (!$target) {
+            return response()->json(['success' => false, 'message' => 'Shipment plan tidak ditemukan.'], 404);
+        }
+        if ($problem = $this->mergeTargetProblem($target)) {
+            return response()->json(['success' => false, 'message' => $problem], 422);
+        }
+
+        $search = trim((string) $request->input('q', ''));
+        $idShip = preg_match('/^\s*(?:SP)?0*(\d+)\s*$/i', $search, $m) ? (int) $m[1] : null;
+        $rows = DB::table('export')
+            ->where('exportpk', '<>', $target->exportpk)
+            ->where(fn($q) => $q->whereNull('stscancel')->orWhere('stscancel', '<>', 1))
+            ->where(fn($q) => $q->whereNull('lockship')->orWhere('lockship', '<>', 1))
+            ->when($search !== '', fn($q) => $q->where(function ($w) use ($search, $idShip) {
+                if ($idShip !== null) $w->orWhere('exportpk', $idShip);
+                $w->orWhere('POno', 'like', "%{$search}%")->orWhere('OP', 'like', "%{$search}%")->orWhere('buyer', 'like', "%{$search}%");
+            }))
+            ->orderByDesc('exportpk')
+            ->limit(150)
+            ->get(['exportpk', 'buyer', 'POno', 'OP', 'totctn', 'qty_list', 'contdate', 'GAC']);
+
+        $blocked = $this->mergeSourceProblems($rows->pluck('exportpk')->all());
+        $loaded = DB::connection('mysql_andon')->table('pack')
+            ->whereIn('exportpk', $rows->pluck('exportpk')->all())->whereNotNull('contpk')
+            ->selectRaw('exportpk, COUNT(*) n')->groupBy('exportpk')->pluck('n', 'exportpk');
+        $poCount = DB::table('poexport')->whereIn('exportpk', $rows->pluck('exportpk')->all())
+            ->selectRaw('exportpk, COUNT(*) n')->groupBy('exportpk')->pluck('n', 'exportpk');
+        $targetBuyers = $this->buyerList($target->buyer);
+
+        return response()->json([
+            'success' => true,
+            'idship'  => 'SP' . str_pad($target->exportpk, 4, '0', STR_PAD_LEFT),
+            'buyer'   => implode(', ', $targetBuyers),
+            'data'    => $rows->map(fn($r) => [
+                'exportpk'   => $r->exportpk,
+                'idship'     => 'SP' . str_pad($r->exportpk, 4, '0', STR_PAD_LEFT),
+                'buyer'      => implode(', ', $this->buyerList($r->buyer)),
+                'same_buyer' => (bool) array_intersect($this->buyerList($r->buyer), $targetBuyers),
+                'POno'       => $r->POno,
+                'OP'         => $r->OP,
+                'po_count'   => (int) ($poCount[$r->exportpk] ?? 0),
+                'totctn'     => (int) $r->totctn,
+                'qty'        => (int) $r->qty_list,
+                'loaded'     => (int) ($loaded[$r->exportpk] ?? 0),
+                'eca'        => $r->contdate,
+                'blocked'    => $blocked[$r->exportpk] ?? null,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * POST /export/merge  body: exportpk (tujuan), sources[] (shipment yang digabung)
+     * - PO / OP shipment sumber dipindah ke tujuan (poexport disalin, yang sudah ada di tujuan dilewati)
+     * - buyer, popks, POno / OP, totctn & qty_list (daftar qty per PO) tujuan diperbarui
+     * - carton shipment sumber di-unload (pack.exportpk / exportdtpk / contpk / part = null; status 6 -> 4,
+     *   ceklis security dibatalkan seperti batal ceklis), data ship (sistem lama) dihapus -- sama dengan cancel shipment
+     * - shipment sumber jadi Cancel, remark diberi catatan "Digabung ke SPxxxx"
+     */
+    public function mergeShipment(Request $request)
+    {
+        $v = $request->validate([
+            'exportpk'  => 'required|integer',
+            'sources'   => 'required|array|min:1|max:50',
+            'sources.*' => 'integer|distinct',
+        ], ['sources.required' => 'Pilih minimal 1 shipment plan yang akan digabung.']);
+
+        $targetId = (int) $v['exportpk'];
+        $sourceIds = array_values(array_unique(array_map('intval', $v['sources'])));
+        if (in_array($targetId, $sourceIds, true)) {
+            return response()->json(['success' => false, 'message' => 'Shipment tujuan tidak bisa digabung ke dirinya sendiri.'], 422);
+        }
+
+        $andon = DB::connection('mysql_andon');
+        DB::beginTransaction();
+        $andon->beginTransaction();
+        try {
+            $target = DB::table('export')->where('exportpk', $targetId)->lockForUpdate()->first();
+            if (!$target) {
+                throw new \RuntimeException('Shipment plan tujuan tidak ditemukan.');
+            }
+            if ($problem = $this->mergeTargetProblem($target)) {
+                throw new \RuntimeException($problem);
+            }
+            $sources = DB::table('export')->whereIn('exportpk', $sourceIds)->lockForUpdate()->get()->keyBy('exportpk');
+            $idOf = fn($id) => 'SP' . str_pad($id, 4, '0', STR_PAD_LEFT);
+            $errors = [];
+            foreach ($sourceIds as $id) {
+                $src = $sources[$id] ?? null;
+                if (!$src) {
+                    $errors[] = $idOf($id) . ': tidak ditemukan';
+                } elseif ((int) $src->stscancel === 1) {
+                    $errors[] = $idOf($id) . ': sudah di-cancel';
+                } elseif ((int) $src->lockship === 1) {
+                    $errors[] = $idOf($id) . ': sudah Lock Shipment';
+                }
+            }
+            foreach ($this->mergeSourceProblems($sourceIds) as $id => $why) {
+                $errors[] = $idOf($id) . ': ' . $why;
+            }
+            if ($errors) {
+                throw new \RuntimeException('Shipment tidak bisa digabung. ' . implode('; ', array_unique($errors)) . '.');
+            }
+
+            // 1) PO / OP pindah ke tujuan
+            $exists = [];
+            foreach (DB::table('poexport')->where('exportpk', $targetId)->get(['POno', 'OP', 'poref']) as $r) {
+                $exists[$r->POno . '|' . $r->OP . '|' . trim((string) $r->poref)] = true;
+            }
+            $moved = 0;
+            $skipped = [];
+            foreach (DB::table('poexport')->whereIn('exportpk', $sourceIds)->orderBy('exportpk')->orderBy('poexportpk')->get() as $r) {
+                $key = $r->POno . '|' . $r->OP . '|' . trim((string) $r->poref);
+                if (isset($exists[$key])) {
+                    $skipped[] = $r->POno . ($r->OP ? ' / ' . $r->OP : '');
+                    continue;
+                }
+                $exists[$key] = true;
+                $row = (array) $r;
+                unset($row['poexportpk']);
+                $row['exportpk'] = $targetId;
+                DB::table('poexport')->insert($row);
+                $moved++;
+            }
+
+            // 2) header tujuan: buyer, POno / OP, popks, total carton & qty
+            $buyers = $this->buyerList($target->buyer);
+            foreach ($sources as $src) {
+                $buyers = array_merge($buyers, $this->buyerList($src->buyer));
+            }
+            $sep = (strpos((string) $target->POno, ', ') !== false) ? ', ' : ',';
+            $rows = DB::table('poexport')->where('exportpk', $targetId)->orderBy('poexportpk')->get(['POno', 'OP', 'qty']);
+            DB::table('export')->where('exportpk', $targetId)->update([
+                'buyer'    => implode(',', array_values(array_unique($buyers))),
+                'POno'     => implode($sep, array_values(array_unique(array_filter($rows->pluck('POno')->all(), 'strlen')))),
+                'OP'       => implode($sep, array_values(array_unique(array_filter($rows->pluck('OP')->all(), 'strlen')))),
+                'totctn'   => DB::raw('COALESCE(totctn,0) + ' . (int) $sources->sum('totctn')),
+                // qty_list = daftar qty per PO (urutan poexport), mis. "1440,120,527"
+                'qty_list' => $rows->pluck('qty')->map(fn($q) => (int) $q)->implode(','),
+                'dateupdt' => now(),
+            ]);
+            $srcPopks = $sources->pluck('popks')->flatMap(fn($p) => explode(',', (string) $p))->all();
+            $this->syncExportPopks($targetId, $srcPopks);
+
+            // 3) carton shipment sumber di-unload (sama dengan cancel shipment) + batal ceklis security
+            $packpks = DB::table('exportdt')->whereIn('exportpk', $sourceIds)->whereNotNull('packpk')->pluck('packpk')->unique()->values();
+            $unloaded = $andon->table('pack')->whereIn('exportpk', $sourceIds)->whereNotNull('contpk')->count();
+            $andon->table('pack')->whereIn('exportpk', $sourceIds)->where('status', 6)
+                ->update(['status' => 4, 'cekdate2' => null, 'datescan' => null]);
+            $andon->table('pack')->whereIn('exportpk', $sourceIds)->update([
+                'exportpk' => null, 'exportdtpk' => null, 'contpk' => null, 'part' => null,
+            ]);
+            if ($packpks->isNotEmpty()) {
+                $andon->table('ship')->whereIn('packpk', $packpks)->delete();
+            }
+
+            // 4) shipment sumber jadi Cancel (soft cancel: poexport & exportdt tetap, seperti cancel shipment)
+            $note = 'Digabung ke ' . $idOf($targetId) . ' oleh ' . (Session::get('login') ?: 'EXIM') . ' ' . now()->format('d/m/Y H:i');
+            foreach ($sources as $src) {
+                DB::table('export')->where('exportpk', $src->exportpk)->update([
+                    'stscancel' => 1,
+                    'remark'    => trim(trim((string) $src->remark) . "\n" . $note),
+                    'dateupdt'  => now(),
+                ]);
+            }
+
+            $andon->commit();
+            DB::commit();
+        } catch (\RuntimeException $e) {
+            $andon->rollBack();
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            $andon->rollBack();
+            DB::rollBack();
+            report($e);
+            return response()->json(['success' => false, 'message' => 'Gagal menggabung shipment: ' . $e->getMessage()], 500);
+        }
+
+        $names = implode(', ', array_map($idOf, $sourceIds));
+        return response()->json([
+            'success' => true,
+            'message' => $names . ' digabung ke ' . $idOf($targetId) . ": {$moved} PO dipindah"
+                . ($unloaded ? ", {$unloaded} carton di-unload dari container" : '')
+                . '. Shipment asal sudah Cancel.'
+                . ($skipped ? ' PO yang sudah ada di tujuan dilewati: ' . implode(', ', array_unique($skipped)) . '.' : ''),
+        ]);
+    }
+
+    // shipment tujuan penggabungan harus aktif, belum Lock Shipment, belum Complete / container belum keluar pabrik
+    private function mergeTargetProblem($target): ?string
+    {
+        if ((int) $target->stscancel === 1) return 'Shipment tujuan sudah di-cancel.';
+        if ((int) $target->lockship === 1) return 'Shipment tujuan sudah Lock Shipment, tidak bisa menerima PO lain.';
+        if ($why = $this->mergeSourceProblems([$target->exportpk])[$target->exportpk] ?? null) {
+            return 'Shipment tujuan tidak bisa menerima PO lain: ' . $why . '.';
+        }
+        return null;
+    }
+
+    // alasan shipment tidak bisa digabung (carton sudah Complete Shipment / container sudah keluar pabrik)
+    private function mergeSourceProblems(array $ids): array
+    {
+        if (!$ids) return [];
+        $out = [];
+        $done = DB::connection('mysql_andon')->table('pack')->whereIn('exportpk', $ids)->where('status', 7)
+            ->selectRaw('exportpk, COUNT(*) n')->groupBy('exportpk')->pluck('n', 'exportpk');
+        foreach ($done as $id => $n) {
+            $out[$id] = "{$n} carton sudah Complete Shipment (Uncomplete dulu)";
+        }
+        if (in_array('gate_out_at', Schema::getColumnListing('cont'), true)) {
+            $left = DB::table('cont')->whereIn('exportpk', $ids)->whereNotNull('gate_out_at')
+                ->selectRaw('exportpk, COUNT(*) n')->groupBy('exportpk')->pluck('n', 'exportpk');
+            foreach ($left as $id => $n) {
+                $out[$id] = $out[$id] ?? "{$n} container sudah keluar pabrik";
+            }
+        }
+        return $out;
+    }
+
+    // export.buyer bisa berisi beberapa buyer dipisah koma ("PERRY ELLIS,PE NIKE") -> ['PERRY ELLIS', 'PE NIKE']
+    private function buyerList($buyer): array
+    {
+        return array_values(array_unique(array_filter(array_map('trim', explode(',', (string) $buyer)), fn($b) => $b !== '')));
+    }
+
     public function availablePo(Request $request, $exportpk)
     {
         $andon  = DB::connection('mysql_andon');
@@ -3445,7 +4128,9 @@ class ShipplanController extends Controller
             return response()->json(['success' => false, 'message' => 'Shipment plan tidak ditemukan.'], 404);
         }
         $buyer = trim((string) $export->buyer);
-        if ($buyer === '') {
+        // shipment bisa berisi beberapa buyer (export.buyer "PERRY ELLIS,PE NIKE"): PO dari salah satunya boleh ditambah
+        $buyers = $this->buyerList($buyer);
+        if (!$buyers) {
             return response()->json(['success' => false, 'message' => 'Buyer shipment plan ini belum terisi.'], 422);
         }
 
@@ -3458,7 +4143,7 @@ class ShipplanController extends Controller
         $qa = $andon->table('pack as p')
             ->join('po', 'po.popk', '=', 'p.popk')
             ->whereNull('p.exportpk')
-            ->where('po.' . self::PACK_BUYER_COL, $buyer)
+            ->whereIn('po.' . self::PACK_BUYER_COL, $buyers)
             ->groupBy('p.POno', 'p.OP', 'po.poref')
             ->selectRaw('p.POno, p.OP, po.poref, MAX(po.' . self::PO_BUYER_COL . ') as buyer, COUNT(*) as ctn, SUM(p.pcsp) as qty')
             ->orderBy('p.OP', 'DESC')
@@ -3466,7 +4151,7 @@ class ShipplanController extends Controller
 
         // B) PO yang belum ada packnya sama sekali -> langsung dari tabel po
         $qb = $andon->table('po')
-            ->where('po.' . self::PO_BUYER_COL, $buyer)
+            ->whereIn('po.' . self::PO_BUYER_COL, $buyers)
             ->whereNotExists(function ($q) {
                 $q->select(DB::raw(1))->from('pack')->whereRaw('pack.popk = po.popk');
             })
@@ -3528,7 +4213,7 @@ class ShipplanController extends Controller
 
         return response()->json([
             'success' => true,
-            'buyer'   => $buyer,
+            'buyer'   => implode(', ', $buyers),
             'idship'  => 'SP' . str_pad($export->exportpk, 4, '0', STR_PAD_LEFT),
             'data'    => $rows,
         ]);
@@ -3583,8 +4268,8 @@ class ShipplanController extends Controller
             $totQty  = 0;
             $skipped = [];
 
-            $buyer = trim((string) $export->buyer);
-            if ($buyer === '') {
+            $buyers = $this->buyerList($export->buyer);   // bisa lebih dari satu buyer (dipisah koma)
+            if (!$buyers) {
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Buyer shipment plan ini belum terisi.'], 422);
             }
@@ -3605,7 +4290,7 @@ class ShipplanController extends Controller
                 // PO harus ada di tabel po dengan buyer yang sama
                 $poOk = $wherePoref($andon->table('po'), $poref)
                     ->where('POno', $pono)->where('OP', $op)
-                    ->where('po.' . self::PO_BUYER_COL, $buyer)
+                    ->whereIn('po.' . self::PO_BUYER_COL, $buyers)
                     ->exists();
 
                 if (!$poOk) {
@@ -3619,9 +4304,9 @@ class ShipplanController extends Controller
                     ->whereNull('exportpk')
                     ->where('POno', $pono)
                     ->where('OP', $op)
-                    ->whereIn('popk', function ($q) use ($poref, $buyer, $wherePoref) {
+                    ->whereIn('popk', function ($q) use ($poref, $buyers, $wherePoref) {
                         $q->select('popk')->from('po')
-                            ->where(self::PO_BUYER_COL, $buyer);   // buyer dari tabel po
+                            ->whereIn(self::PO_BUYER_COL, $buyers);   // buyer dari tabel po
                         $wherePoref($q, $poref);
                     })
                     ->selectRaw('COUNT(*) as ctn, COALESCE(SUM(pcsp),0) as qty')
@@ -3642,7 +4327,7 @@ class ShipplanController extends Controller
                     $addedPopks,
                     $wherePoref($andon->table('po'), $poref)
                         ->where('POno', $pono)->where('OP', $op)
-                        ->where(self::PO_BUYER_COL, $buyer)
+                        ->whereIn(self::PO_BUYER_COL, $buyers)
                         ->pluck('popk')->all()
                 );
 

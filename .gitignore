@@ -13,4 +13,13 @@ npm-debug.log
 yarn-error.log
 /.idea
 /.vscode
-public/upload/foto_container/
+
+# --- file upload / hasil pengguna (foto, video, dokumen) - tidak ikut repo ---
+# isi folder upload diabaikan; foldernya tetap ada lewat .gitkeep supaya aplikasi bisa langsung menyimpan file
+# (contoh: upload/gate = foto & video Security Gate, upload/foto_container = foto container EXIM, resi = PDF resi)
+/public/upload/*/**
+!/public/upload/*/.gitkeep
+# template Excel import tetap ikut repo
+!/public/upload/contoh-baku/**
+/public/resi/**
+!/public/resi/.gitkeep

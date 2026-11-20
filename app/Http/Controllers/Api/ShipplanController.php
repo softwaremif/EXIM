@@ -20,7 +20,7 @@ class ShipplanController extends Controller
     public function getListExport(Request $request)
     {
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(15)
+            $response = \Illuminate\Support\Facades\Http::packing()->timeout(15)
                 ->get($this->packingBaseUrl().'/api/packing/all-loaded-cartons');
             $packingRows = $response->successful() ? collect($response->json('rows') ?? []) : collect();
         } catch (\Throwable $e) {
@@ -61,7 +61,9 @@ class ShipplanController extends Controller
                     'segel'       => $contRow->segel ?? null,
                     'carton'      => $first['carton'],
                     'mif'         => $first['mif'],
-                ]);
+                ] + ($contRow && property_exists($contRow, 'gate_open_at')
+                    // Jam buka container (Security Gate) -- syarat tombol Mulai stuffing di sistem Packing List
+                    ? ['gate_open_at' => $contRow->gate_open_at] : []));
             })
             ->values();
 
@@ -81,6 +83,49 @@ class ShipplanController extends Controller
         return response()->json([
             'total' => $total,
             'rows'  => $result,
+        ]);
+    }
+
+    // GET api/dockBoard : loading dock Security Gate (table cont_stuffing) untuk layar TV stuffing.
+    //   doors    {mif: jumlah dock}
+    //   active   container yang sedang di dock: [{contpk, exportpk, mif, pintu, masuk_at}]
+    //   incoming container pindah menuju MIF lain, belum masuk dock: [{contpk, exportpk, mif (asal), tujuan_mif, at}]
+    //   waiting  sudah gate in & lulus, belum keluar, tidak di dock / tidak pindah (<= 14 hari): [{contpk, exportpk, mif|null, at}]
+    public function dockBoard()
+    {
+        $gate = \App\Http\Controllers\Security\GateController::class;
+        $table = $gate::STUFFING_TABLE;
+        if (!\Illuminate\Support\Facades\Schema::hasTable($table)) {
+            return response()->json(['success' => false, 'message' => 'Table loading dock belum ada.'], 404);
+        }
+        $active = DB::table($table . ' as s')->join('cont', 'cont.contpk', '=', 's.contpk')
+            ->where('s.aktif', 1)->whereNull('cont.gate_out_at')
+            ->get(['s.contpk', 'cont.exportpk', 's.mif', 's.pintu', 's.masuk_at']);
+        $latest = DB::table($table)->selectRaw('MAX(stfpk) AS stfpk')->groupBy('contpk');
+        $last = DB::table($table . ' as s')->joinSub($latest, 'x', 'x.stfpk', '=', 's.stfpk')
+            ->join('cont', 'cont.contpk', '=', 's.contpk')->whereNull('cont.gate_out_at')
+            ->get(['s.contpk', 'cont.exportpk', 's.mif', 's.status', 's.tujuan_mif', 's.keluar_at'])->keyBy('contpk');
+        $incoming = $last->filter(fn($r) => $r->status === 'pindah' && !$active->contains('contpk', $r->contpk))
+            ->map(fn($r) => ['contpk' => (int) $r->contpk, 'exportpk' => (int) $r->exportpk, 'mif' => (int) $r->mif, 'tujuan_mif' => (int) $r->tujuan_mif, 'at' => $r->keluar_at])
+            ->values();
+        $waiting = DB::table('cont')->join('export', 'export.exportpk', '=', 'cont.exportpk')
+            ->whereNotNull('cont.actcontdate')->whereNull('cont.gate_out_at')
+            ->where('cont.actcontdate', '>=', now()->subDays(14))
+            ->where(fn($q) => $q->whereNull('cont.gate_result')->orWhere('cont.gate_result', '<>', 0))
+            ->where(fn($q) => $q->whereNull('export.stscancel')->orWhere('export.stscancel', '<>', 1))
+            ->whereNotIn('cont.contpk', $active->pluck('contpk'))
+            ->whereNotIn('cont.contpk', $incoming->pluck('contpk'))
+            ->orderBy('cont.actcontdate')
+            ->get(['cont.contpk', 'cont.exportpk', 'cont.actcontdate'])
+            ->map(fn($r) => ['contpk' => (int) $r->contpk, 'exportpk' => (int) $r->exportpk,
+                'mif' => isset($last[$r->contpk]) ? (int) $last[$r->contpk]->mif : null, 'at' => $r->actcontdate]);
+
+        return response()->json([
+            'success'  => true,
+            'doors'    => $gate::DOORS,
+            'active'   => $active->map(fn($r) => ['contpk' => (int) $r->contpk, 'exportpk' => (int) $r->exportpk, 'mif' => (int) $r->mif, 'pintu' => (int) $r->pintu, 'masuk_at' => $r->masuk_at])->values(),
+            'incoming' => $incoming,
+            'waiting'  => $waiting->values(),
         ]);
     }
 
@@ -118,6 +163,19 @@ class ShipplanController extends Controller
         }
         if (!empty($validated['end_ship'])) {
             $updateData['end_ship'] = Carbon::parse($validated['end_ship'])->toDateTimeString();
+        }
+
+        // Mulai stuffing -> isi juga "Jam mulai muat" Security Gate (berita acara stuffing),
+        // hanya kalau masih kosong (isian security tidak ditimpa) & container belum keluar.
+        if (!empty($updateData['start_ship']) && \Illuminate\Support\Facades\Schema::hasColumn('cont', 'gate_load_at')
+            && empty($contRow->gate_load_at) && empty($contRow->gate_out_at ?? null)) {
+            $updateData['gate_load_at'] = $updateData['start_ship'];
+        }
+        // Tim stuffing boleh mulai tanpa menunggu security: "Jam buka container" yang masih kosong
+        // diisi = jam mulai stuffing; kalau security sudah mengisi, jam bukanya tidak ditimpa.
+        if (!empty($updateData['start_ship']) && property_exists($contRow, 'gate_open_at')
+            && empty($contRow->gate_open_at) && empty($contRow->gate_out_at ?? null)) {
+            $updateData['gate_open_at'] = $updateData['start_ship'];
         }
 
         DB::table('cont')->where('contpk', $validated['contpk'])->update($updateData);

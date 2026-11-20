@@ -1264,6 +1264,44 @@
             color: #f5f5f7;
         }
 
+        /* container ditolak security */
+        .ld-status-rejected {
+            background: #fde4e1;
+            color: #b42318;
+        }
+
+        .ld-reject-box {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #fde4e1;
+            color: #7a1a12;
+            font-size: .8rem;
+            line-height: 1.35;
+        }
+
+        .ld-reject-box > i {
+            font-size: 1.1rem;
+            color: #b42318;
+        }
+
+        .ld-reject-box strong,
+        .ld-reject-box span {
+            display: block;
+        }
+
+        .ld-replaced {
+            color: #1f5fa8;
+        }
+
+        .ld-btn-action.ld-btn-replace {
+            background: #b42318;
+            border-color: #b42318;
+            color: #fff;
+        }
+
         /* ===================== VISUAL CONTAINER (TRIGGER) ===================== */
         .ld-container-visual {
             border: none;
@@ -3356,7 +3394,7 @@
 
             // cek query param untuk auto-buka modal
             const params = new URLSearchParams(window.location.search);
-            if (params.get('open_modal') === 'container') {
+            if (params.get('open_modal') === 'container' && @json($canEdit ?? true)) {
                 openEditShipmentModal();
             }
         });
@@ -3410,42 +3448,30 @@
             return day + '/' + month + '/' + year + ' ' + hour + ':' + minute;
         }
 
+        // "dd/mm/yyyy HH:mm" -> Date, atau null kalau tidak valid. Jam boleh diketik
+        // 14:30, 14.30, atau 1430. Tanggal/jam di luar rentang (mis. 31/02, jam 25) tidak
+        // digeser diam-diam ke tanggal lain seperti new Date(), tapi dianggap tidak valid.
+        function parseDmyHm(s) {
+            var m = String(s || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2})(?:[:.]?(\d{2}))?(?::\d{2})?)?$/);
+            if (!m) {
+                return null;
+            }
+
+            var day = parseInt(m[1], 10);
+            var month = parseInt(m[2], 10);
+            var year = parseInt(m[3], 10);
+            var hour = m[4] !== undefined ? parseInt(m[4], 10) : 0;
+            var minute = m[5] !== undefined ? parseInt(m[5], 10) : 0;
+
+            var d = new Date(year, month - 1, day, hour, minute);
+            if (hour > 23 || minute > 59 || d.getDate() !== day || d.getMonth() !== month - 1) {
+                return null;
+            }
+            return d;
+        }
+
         function myparser2(s) {
-            if (!s) {
-                return new Date();
-            }
-
-            // Format: dd/mm/yyyy HH:mm
-            var parts = s.split(' ');
-
-            var datePart = parts[0];
-            var timePart = parts[1] || '00:00';
-
-            var dateParts = datePart.split('/');
-            var timeParts = timePart.split(':');
-
-            var day = parseInt(dateParts[0], 10);
-            var month = parseInt(dateParts[1], 10);
-            var year = parseInt(dateParts[2], 10);
-
-            var hour = parseInt(timeParts[0], 10) || 0;
-            var minute = parseInt(timeParts[1], 10) || 0;
-
-            if (
-                !isNaN(day) &&
-                !isNaN(month) &&
-                !isNaN(year)
-            ) {
-                return new Date(
-                    year,
-                    month - 1,
-                    day,
-                    hour,
-                    minute
-                );
-            }
-
-            return new Date();
+            return parseDmyHm(s) || new Date();
         }
 
         function myparser3(s) {
@@ -3614,6 +3640,7 @@
                     if (preset) {
                         $(input).datetimebox('setValue', preset);
                     }
+                    // jam tiba bisa diisi / diedit EXIM (juga diisi security saat gate in)
                 } catch (err) {
                     console.error('[shipplan] init datetimebox actcontdate gagal:', err);
                 }
@@ -3765,11 +3792,11 @@
                             vessnameInput?.value || '-';
                     }
 
-                    // Field teks kartu arrival (noseal ada di kartu tab foto, bukan di sini)
+                    // Field teks kartu arrival (No. Seal pindah ke sini dari tab Container Leave)
                     arrivalEl.dataset.uid = sourceItem.dataset.uid;
                     const saved = existingValues[sourceItem.dataset.uid] || {};
 
-                    ['contno', 'nopol'].forEach(field => {
+                    ['contno', 'nopol', 'noseal'].forEach(field => {
                         const input = arrivalEl.querySelector(`[data-field="${field}"]`);
                         if (!input) return;
 
@@ -3914,6 +3941,100 @@
                 slotEl.querySelector('.container-foto-preview').innerHTML = '';
             }
 
+            // tab Container Leave: data keluar dari security (baca saja), dari detail_json -> gate
+            const containerGateInfo = new Map(); // uid card -> data gate (jam keluar, dokumentasi, dokumen)
+
+            function renderGateLeave(cardEl, gate) {
+                const outInput = cardEl.querySelector('[data-gate="out_at"]');
+                const mediaBox = cardEl.querySelector('[data-gate="media"]');
+                const docsBox = cardEl.querySelector('[data-gate="docs"]');
+                if (!outInput || !mediaBox || !docsBox) return;
+
+                const empty = text => {
+                    const span = document.createElement('span');
+                    span.className = 'gate-empty';
+                    span.textContent = text;
+                    return span;
+                };
+                mediaBox.innerHTML = '';
+                docsBox.innerHTML = '';
+                outInput.value = (gate && gate.out_at) || '';
+
+                if (!gate) {
+                    mediaBox.appendChild(empty('Simpan shipment plan dulu. Data keluar diisi security.'));
+                    docsBox.appendChild(empty('Belum ada dokumen.'));
+                    return;
+                }
+                if (gate.rejected) {
+                    outInput.placeholder = 'Container ditolak security';
+                }
+
+                const photoCount = gate.media.reduce((n, g) => n + g.urls.length, 0);
+                if (!photoCount && !gate.video) {
+                    mediaBox.appendChild(empty(gate.rejected
+                        ? 'Container tidak lulus pemeriksaan, tidak ada pemuatan.'
+                        : 'Belum ada dokumentasi. Diambil security saat selesai stuffing, segel, dan container keluar.'));
+                } else {
+                    gate.media.forEach(group => {
+                        const wrap = document.createElement('div');
+                        wrap.className = 'gate-media-group';
+                        const title = document.createElement('div');
+                        title.className = 'gate-media-group__title';
+                        title.textContent = `${group.label} (${group.urls.length})`;
+                        wrap.appendChild(title);
+                        if (!group.urls.length) {
+                            wrap.appendChild(empty('Tidak ada foto.'));
+                        } else {
+                            const thumbs = document.createElement('div');
+                            thumbs.className = 'gate-thumbs';
+                            group.urls.forEach((url, i) => {
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.target = '_blank';
+                                a.rel = 'noopener';
+                                const img = document.createElement('img');
+                                img.src = url;
+                                img.loading = 'lazy';
+                                img.alt = `${group.label} ${i + 1}`;
+                                a.appendChild(img);
+                                thumbs.appendChild(a);
+                            });
+                            wrap.appendChild(thumbs);
+                        }
+                        mediaBox.appendChild(wrap);
+                    });
+                    if (gate.video) {
+                        // video sebagai grup sendiri supaya sejajar dengan grup foto
+                        const wrap = document.createElement('div');
+                        wrap.className = 'gate-media-group gate-media-group--video';
+                        const title = document.createElement('div');
+                        title.className = 'gate-media-group__title';
+                        title.textContent = 'Video segel';
+                        const video = document.createElement('video');
+                        video.className = 'gate-video';
+                        video.src = gate.video;
+                        video.controls = true;
+                        video.preload = 'metadata';
+                        wrap.append(title, video);
+                        mediaBox.appendChild(wrap);
+                    }
+                }
+
+                if (!gate.docs.length) {
+                    docsBox.appendChild(empty('Dokumen tersedia setelah container tiba dan diperiksa security.'));
+                }
+                gate.docs.forEach(doc => {
+                    const a = document.createElement('a');
+                    a.className = 'btn btn-outline-primary btn-sm';
+                    a.href = doc.url;
+                    a.target = '_blank';
+                    a.rel = 'noopener';
+                    a.innerHTML = '<i class="bi bi-file-earmark-text"></i> ';
+                    a.appendChild(document.createTextNode(doc.label));
+                    docsBox.appendChild(a);
+                });
+            }
+
             function syncContainerFotoTab() {
                 const fotoList = document.getElementById('containerFotoList');
                 const fotoTemplate = document.getElementById('containerFotoCardTemplate');
@@ -3951,6 +4072,7 @@
                     const arrivalItem = arrivalItems[i];
                     const contnoInput = arrivalItem?.querySelector('[data-field="contno"]');
                     el.querySelector('.container-foto-vessel').textContent = contnoInput?.value || '-';
+                    renderGateLeave(el, containerGateInfo.get(sourceItem.dataset.uid));
 
                     // tombol foto dikunci dulu, baru dibuka kalau semua carton sudah masuk container
                     applyFotoLock(el, null);
@@ -4207,6 +4329,9 @@
                         containerFotoUrls.set(fotoKey(el.dataset.uid, slot), fotoUrls[slot]);
                     }
                 });
+                if (data && data.gate) {
+                    containerGateInfo.set(el.dataset.uid, data.gate);
+                }
 
                 containerList.appendChild(el);
 
@@ -4252,12 +4377,15 @@
                 });
 
 
+                // tanggal & jam bisa diketik langsung atau dipilih dari kalender + spinner jam
                 $('#closetime').datetimebox({
-                    editable: false,
+                    editable: true,
+                    showSeconds: false,
                     onChange: function(newValue) {
                         validateAndCorrectCloseTime(newValue);
                     },
                 });
+                bindCloseTimeTyping();
 
                 // kalau ada data pending dari mode edit, isi SEKARANG (widget sudah pasti siap)
                 if (window.__pendingExdateEditData) {
@@ -4303,6 +4431,7 @@
                 // reset dulu state foto dari sesi sebelumnya
                 containerFotoFiles.clear();
                 containerFotoUrls.clear();
+                containerGateInfo.clear();
                 containerFotoRemoved.clear();
                 fotoReadyCache.clear(); // status carton bisa sudah berubah sejak modal terakhir dibuka
 
@@ -4374,6 +4503,17 @@
                                 $('#fwd').combobox('setValue', data.fwdpk);
                             } else {
                                 forwarderCombo.value = data.fwdpk;
+                            }
+                        }
+
+                        // ekspedisi: kosongkan kalau shipment ini belum punya, supaya pilihan shipment lain tidak terbawa
+                        const ekspedisiCombo = document.getElementById('ekspedisi');
+                        if (ekspedisiCombo) {
+                            const eks = data.ekspedisipk !== undefined && data.ekspedisipk !== null ? data.ekspedisipk : '';
+                            if ($(ekspedisiCombo).data('combobox')) {
+                                $('#ekspedisi').combobox('setValue', eks);
+                            } else {
+                                ekspedisiCombo.value = eks;
                             }
                         }
 
@@ -4584,16 +4724,57 @@
                 if (!minDate || isNaN(minDate.getTime())) return;
                 minDate.setHours(0, 0, 0, 0);
 
-                const closeDate = typeof myparser3 === 'function' ? myparser3(newValue) : new Date(newValue);
-                if (!closeDate || isNaN(closeDate.getTime())) return;
+                // saat diketik, onChange terpanggil di setiap ketikan; validasi ditunda sampai
+                // field ditinggalkan (bindCloseTimeTyping) supaya tidak dikosongkan di tengah mengetik
+                if ($('#closetime').datetimebox('textbox').is(':focus')) return;
+                const closeDate = parseDmyHm(newValue);
+                if (!closeDate) return;
 
                 if (closeDate < minDate) {
-                    isCorrectingCloseTime = true;
-                    $('#closetime').datetimebox('setValue', '');
-                    isCorrectingCloseTime = false;
+                    // dikosongkan setelah EasyUI selesai setValue; kalau langsung, EasyUI menimpanya
+                    // lagi dengan nilai yang sama dan validasi (serta toast) terjadi dua kali
+                    setTimeout(function() {
+                        isCorrectingCloseTime = true;
+                        $('#closetime').datetimebox('setValue', '');
+                        isCorrectingCloseTime = false;
+                    }, 0);
 
                     showToast('Close Time tidak boleh lebih awal dari Ex-Factory Date.', 'error');
                 }
+            }
+
+            // EasyUI tidak merapikan teks yang diketik; tanpa ini "16/10/2026 1430" terkirim
+            // apa adanya dan gagal diparse server (format d/m/Y H:i). Dirapikan saat field
+            // ditinggalkan; yang tidak valid dikembalikan ke nilai sebelumnya.
+            function bindCloseTimeTyping() {
+                const $box = $('#closetime');
+                $box.datetimebox('textbox')
+                    .off('.closetime')
+                    .on('focus.closetime', function() {
+                        this.dataset.lastValid = parseDmyHm($box.datetimebox('getValue')) ? $box.datetimebox('getValue') : '';
+                    })
+                    .on('blur.closetime', function() {
+                        // klik di panel kalender/spinner juga memicu blur; biarkan panel yang mengisi
+                        if ($box.datetimebox('panel').is(':visible')) return;
+
+                        const text = $.trim($(this).val());
+                        if (!text) {
+                            $box.datetimebox('setValue', '');
+                            return;
+                        }
+                        const date = parseDmyHm(text);
+                        if (!date) {
+                            $box.datetimebox('setValue', this.dataset.lastValid || '');
+                            showToast('Format Close Time: dd/mm/yyyy HH:mm, contoh 16/10/2026 14:30.', 'error');
+                            return;
+                        }
+                        // validasi dipanggil sekali di sini; onChange tidak terpanggil kalau
+                        // teks ketikan sudah sama persis dengan hasil format
+                        isCorrectingCloseTime = true;
+                        $box.datetimebox('setValue', myformatter2(date));
+                        isCorrectingCloseTime = false;
+                        validateAndCorrectCloseTime(myformatter2(date));
+                    });
             }
 
             // hancurkan widget easyui di kartu arrival lalu kosongkan list-nya.
@@ -5311,7 +5492,7 @@
                             `${cartonIds.length} carton berhasil dimuat ke container.`, 'success');
 
                     })
-                    .catch(err => alert(err.message))
+                    .catch(err => appAlert(err.message, { type: 'error', title: 'Gagal memuat carton' }))
                     .finally(() => {
                         btnSubmit.disabled = false;
                         btnSubmit.innerHTML = originalHtml;
@@ -6993,6 +7174,42 @@
             });
         }
 
+        // ganti container yang ditolak security
+        const replaceModal = new bootstrap.Modal(document.getElementById('modalReplaceContainer'));
+        const rcConfirmBtn = document.getElementById('rcConfirmBtn');
+        $(document).on('click', '.btn-replace-container', function() {
+            const contpk = $(this).data('contpk');
+            const cartons = parseInt($(this).attr('data-cartons'), 10) || 0;
+            document.getElementById('rcOldNo').textContent = $(this).attr('data-contno') || 'tanpa nomor';
+            document.getElementById('rcCartonCount').textContent = cartons;
+            document.getElementById('rcCartonWarn').hidden = cartons === 0;
+            document.getElementById('rcContno').value = '';
+            replaceModal.show();
+
+            rcConfirmBtn.onclick = function() {
+                rcConfirmBtn.disabled = true;
+                rcConfirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memproses...';
+                $.ajax({
+                    url: "{{ route('containers.replace', ['contpk' => '__ID__']) }}".replace('__ID__', contpk),
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        contno: document.getElementById('rcContno').value.trim(),
+                    },
+                    success: function(res) {
+                        sessionStorage.setItem('ldToastMessage', res.message || 'Container berhasil diganti.');
+                        sessionStorage.setItem('ldToastType', 'success');
+                        location.reload();
+                    },
+                    error: function(xhr) {
+                        showToast((xhr.responseJSON && xhr.responseJSON.message) || 'Gagal mengganti container.', 'error');
+                        rcConfirmBtn.disabled = false;
+                        rcConfirmBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Ya, Ganti';
+                    }
+                });
+            };
+        });
+
         function updateRemoveAllButtonState(contpk) {
             const chipsWrap = document.getElementById(`loadedChips-${contpk}`);
             const removeAllBtn = document.querySelector(`.btn-remove-all-cartons[data-contpk="${contpk}"]`);
@@ -7095,6 +7312,13 @@
                                 </button>
                                 <h4 class="shipment-title flex-fill">Informasi Detail Shipment</h4>
                             </div>
+                            {{-- shipment dibuat grup lain: lihat saja (App\Services\ShipplanAccess) --}}
+                            @unless ($canEdit ?? true)
+                                <div class="alert alert-secondary d-flex align-items-center gap-2 py-2 px-3 mb-3" role="status" style="font-size:.85rem;">
+                                    <i class="bi bi-eye"></i>
+                                    <span><b>Mode lihat saja.</b> Shipment plan ini dibuat oleh grup lain. Hanya grup pembuat dan Manager EXIM yang bisa mengubahnya.</span>
+                                </div>
+                            @endunless
 
                             @php
                                 $isPublished = !empty($header->stsexp) && (int) $header->stsexp === 1;
@@ -7165,7 +7389,7 @@
                                     $hidden = $isLocked ? 'd-none' : '';
                                 @endphp
                                 {{-- <div class="{{ $hidden }}"> --}}
-                                <div class="">
+                                <div class="{{ ($canEdit ?? true) ? '' : 'd-none' }}">
                                     <button type="button" class="btn-update-shipment"
                                         onclick="openEditShipmentModal({{ $header->exportpk }})">
                                         <span class="us-icon-wrap">
@@ -7371,7 +7595,12 @@
                                         $status = 'Planning';
                                     }
 
-                                    $islockCont = $c->loading_status === 'shipped' ? 1 : 0;
+                                    // container ditolak security tidak boleh dimuat sampai diganti
+                                    $isRejected = !empty($c->is_rejected);
+                                    // lihat saja (shipment grup lain) dikunci seperti container shipped: tidak bisa muat / keluarkan carton
+                                    $readOnly = !($canEdit ?? true);
+                                    $islockCont = $c->loading_status === 'shipped' || $isRejected || $readOnly ? 1 : 0;
+                                    $lastReplaced = $c->gate_history->last();
                                 @endphp
                                 <div class="col-md-6 col-lg-4">
                                     <div class="ld-card" data-contpk="{{ $c->contpk }}"
@@ -7380,9 +7609,13 @@
                                             <span class="ld-badge">{{ strtoupper($c->type ?? '40HC') }}</span>
                                             <span
                                                 class="ld-badge volume">{{ strtoupper($c->volume ? 'Vol. Container: ' . $c->volume . ' Cbm' : '') }}</span>
-                                            <span class="ld-status ld-status-{{ $c->loading_status ?? 'loading' }}">
-                                                {{ ucfirst($status) }}
-                                            </span>
+                                            @if ($isRejected)
+                                                <span class="ld-status ld-status-rejected">Ditolak Security</span>
+                                            @else
+                                                <span class="ld-status ld-status-{{ $c->loading_status ?? 'loading' }}">
+                                                    {{ ucfirst($status) }}
+                                                </span>
+                                            @endif
                                         </div>
 
                                         @php
@@ -7457,7 +7690,25 @@
                                                     </b>
                                                 </div>
                                                 <div class="ld-meta">No. Seal: <b>{{ $c->noseal ?? '-' }}</b></div>
+                                                @if ($lastReplaced)
+                                                    <div class="ld-meta ld-replaced">
+                                                        <i class="bi bi-arrow-repeat"></i>
+                                                        Menggantikan <b>{{ $lastReplaced->contno ?: 'container tanpa nomor' }}</b>
+                                                        (ditolak {{ $lastReplaced->actcontdate ? \Carbon\Carbon::parse($lastReplaced->actcontdate)->format('d/m/Y') : '-' }}{{ $lastReplaced->gate_result_note ? ' · ' . $lastReplaced->gate_result_note : '' }}){{ $c->gate_history->count() > 1 ? ' · ' . $c->gate_history->count() . 'x diganti' : '' }}
+                                                    </div>
+                                                @endif
                                             </div>
+
+                                            @if ($isRejected)
+                                                <div class="ld-reject-box">
+                                                    <i class="bi bi-shield-exclamation"></i>
+                                                    <div>
+                                                        <strong>Tidak lulus pemeriksaan security</strong>
+                                                        <span>Alasan: {{ $c->gate_result_note ?: '-' }}</span>
+                                                        <span>{{ $c->gate_out_at ? 'Truk sudah keluar ' . \Carbon\Carbon::parse($c->gate_out_at)->format('d/m/Y H:i') : 'Truk masih di area MIF' }}</span>
+                                                    </div>
+                                                </div>
+                                            @endif
 
                                             <div class="ld-loaded-section">
                                                 <div class="ld-loaded-header-row">
@@ -7601,6 +7852,17 @@
                                             </div>
                                         </div>
 
+                                        @if ($isRejected && $readOnly)
+                                            <button type="button" class="ld-btn-action ld-btn-locked" disabled>
+                                                <i class="bi bi-eye"></i> Lihat saja
+                                            </button>
+                                        @elseif ($isRejected)
+                                            <button type="button" class="ld-btn-action ld-btn-replace btn-replace-container"
+                                                data-contpk="{{ $c->contpk }}" data-contno="{{ $c->contno }}"
+                                                data-cartons="{{ $groupedByCarton->count() }}">
+                                                <i class="bi bi-arrow-repeat"></i> Ganti Container
+                                            </button>
+                                        @else
                                         <button type="button"
                                             class="ld-btn-action {{ $islockCont ? 'ld-btn-locked' : '' }}"
                                             @if (!$islockCont) onclick="openLoadingModal(
@@ -7615,9 +7877,10 @@
                                                 disabled @endif>
 
                                             <i
-                                                class="bi {{ $islockCont ? 'bi-lock-fill' : 'bi-box-arrow-in-down' }}"></i>
-                                            {{ $islockCont ? 'Locked' : 'Muat Carton' }}
+                                                class="bi {{ $readOnly ? 'bi-eye' : ($islockCont ? 'bi-lock-fill' : 'bi-box-arrow-in-down') }}"></i>
+                                            {{ $readOnly ? 'Lihat saja' : ($islockCont ? 'Locked' : 'Muat Carton') }}
                                         </button>
+                                        @endif
 
                                         <button type="button" class="ld-view-progress-btn"
                                             onclick="openContainerProgressModal({{ $c->contpk }}, {{ json_encode($c->contno ?? '') }})">
@@ -7661,4 +7924,34 @@
 
     @include('menu.exim-export.shipplan.modal.modalContainer')
     @include('menu.exim-export.shipplan.modal.modalLoading')
+
+    {{-- Ganti container yang ditolak security --}}
+    <div class="modal fade" id="modalReplaceContainer" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+            <div class="modal-content cr-modal">
+                <div class="cr-body">
+                    <div class="cr-icon"><i class="bi bi-arrow-repeat"></i></div>
+                    <h5 class="cr-title">Ganti Container?</h5>
+                    <p class="cr-desc">
+                        Container <span id="rcOldNo" class="ld-mono fw-bold">-</span> ditolak security.
+                        Data pemeriksaannya disimpan sebagai riwayat, lalu card ini dikosongkan untuk container pengganti.
+                    </p>
+                    <div class="alert alert-warning py-2 px-3 small text-start" id="rcCartonWarn" hidden>
+                        <i class="bi bi-box-seam"></i>
+                        <strong id="rcCartonCount">0</strong> carton yang sudah dimuat akan dikeluarkan dari container ini
+                        dan kembali ke daftar carton belum dimuat.
+                    </div>
+                    <label class="form-label small fw-semibold mb-1" for="rcContno">No. container pengganti</label>
+                    <input type="text" class="form-control ld-mono text-uppercase" id="rcContno" maxlength="100" autocomplete="off" placeholder="Boleh dikosongkan">
+                    <div class="form-text">Kalau kosong, security mengisi nomor saat container tiba.</div>
+                </div>
+                <div class="cr-footer">
+                    <button type="button" class="cr-btn cr-btn-ghost" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="cr-btn cr-btn-danger" id="rcConfirmBtn">
+                        <i class="bi bi-arrow-repeat"></i> Ya, Ganti
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection

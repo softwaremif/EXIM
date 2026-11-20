@@ -7,6 +7,17 @@
     <link rel="shortcut icon" href="{!! asset('public/css/images/morich.gif') !!}"/>
     <title>Morich Indo Fashion</title>
     @include('layout.css_global')
+    @if (request()->is('security/gate*'))
+      {{-- login security = bagian aplikasi Security Gate yang bisa diinstal (lihat GateAppController):
+           tanpa manifest di sini, Chrome hanya menawarkan "Tambahkan ke layar utama" (shortcut yang membuka browser) --}}
+      <link rel="manifest" href="{{ route('security.gate.manifest') }}">
+      <meta name="theme-color" content="#ffffff">
+      <meta name="mobile-web-app-capable" content="yes">
+      <meta name="apple-mobile-web-app-capable" content="yes">
+      <meta name="apple-mobile-web-app-title" content="Security Gate">
+      <link rel="apple-touch-icon" href="{{ asset('public/img/security-gate/apple-touch-icon.png') }}">
+      <script src="{{ asset('public/js/security-fullscreen.js') }}?v={{ filemtime(public_path('js/security-fullscreen.js')) }}"></script>
+    @endif
     <style>
       /* .card {
         --bs-card-spacer-y: 1rem;
@@ -173,5 +184,16 @@
         </div>
       </div>
     </div>
+    @if (request()->is('security/gate*'))
+      <script>
+        // service worker aplikasi Security Gate (cakupan security/gate), sama dengan halaman daftar container
+        if ('serviceWorker' in navigator && location.protocol === 'https:') {
+          navigator.serviceWorker.register(@json(route('security.gate.sw')), { scope: @json(route('security.gate.index')) }).catch(function () {});
+        } else if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+          // service worker lama (terdaftar saat flag Chrome aktif) dilepas
+          navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function () {});
+        }
+      </script>
+    @endif
   </body>
 </html>

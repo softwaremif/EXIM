@@ -64,5 +64,7 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'check' => \App\Http\Middleware\SessionVerified::class,
+        // ubah shipment plan: hanya grup pembuat & Manager EXIM (App\Services\ShipplanAccess)
+        'shipplan.owner' => \App\Http\Middleware\ShipplanOwner::class,
     ];
 }

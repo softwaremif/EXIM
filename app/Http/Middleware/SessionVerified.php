@@ -17,7 +17,8 @@ class SessionVerified
      */
     public function handle(Request $request, Closure $next)
     {
-        if (!Session::get('userpk')) return redirect('/');
+        // sesi habis di Security Gate: login security (masih di dalam cakupan aplikasi layar utama)
+        if (!Session::get('userpk')) return $request->is('security/gate*') ? redirect()->route('security.gate.login') : redirect('/');
         
         return $next($request);
     }

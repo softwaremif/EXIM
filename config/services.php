@@ -38,6 +38,8 @@ return [
 
     'packing' => [
         'url' => env('PACKING_API_URL', 'http://192.168.0.22/finishing-packing'),
+        // wajib dikirim ke API Packing List (header X-Api-Key) -- lihat Http::packing()
+        'key' => env('PACKING_API_KEY'),
     ],
 
     // laporan packing list (PDF) di aplikasi finishing-packing, dibuka langsung dari browser

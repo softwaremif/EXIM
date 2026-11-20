@@ -232,57 +232,39 @@
             align-items: center;
         }
 
-        /* filter + sort dalam 1 baris; kotak pencarian yang menyusut/melebar */
-        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
         /* filter di kiri (boleh turun baris, jarak seragam), aksi (muat ulang, export, urutkan) selalu bersama di kanan */
-        --}}
         .sp-toolbar {
             flex-wrap: nowrap;
-            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
             align-items: flex-start;
             gap: 16px;
-            --}}
         }
 
         .sp-filters {
             display: flex;
-            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
             flex-wrap: wrap;
-            --}}
             align-items: center;
-            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
             gap: 8px;
-            --}}
             flex: 1;
             min-width: 0;
         }
 
-        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
         /* jarak antar filter dari gap, bukan padding pembungkus; flex supaya combobox easyui (inline-block)
            tidak menambah celah baseline -> semua kotak tepat 42px dan sejajar */
-        --}}
         .sp-filters>.ps-2 {
-            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
             display: flex;
             align-items: center;
-            --}}
             flex-shrink: 0;
-            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
             padding-left: 0 !important;
         }
 
         .sp-filters .textbox {
             vertical-align: top;
-            --}}
         }
 
         .sp-filters .sp-search-box {
-            flex: 1;
-            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
             display: flex;
             align-items: center;
             flex: 1 1 200px;
-            --}}
             min-width: 180px;
             max-width: 320px;
         }
@@ -291,19 +273,11 @@
             width: 100%;
         }
 
-        @media (max-width: 1280px) {
-            .sp-toolbar,
-            .sp-filters {
-                flex-wrap: wrap;
-                row-gap: 8px;
-            }
-        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
         .sp-toolbar__actions {
             display: flex;
             align-items: center;
             gap: 8px;
             flex-shrink: 0;
-        --}}
         }
 
         /* ================= SORT ================= */
@@ -538,7 +512,6 @@
                 opacity: 1;
                 transform: scale(1);
             }
-        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
         }
 
         /* checkbox filter toolbar (Tampilkan cancel), tinggi sama dengan tombol refresh */
@@ -605,7 +578,6 @@
         .sp-check input:focus-visible+.sp-check__box {
             outline: 3px solid #84ADFF;
             outline-offset: 2px;
-        --}}
         }
 
         .sp-refresh-btn {
@@ -913,7 +885,8 @@
         .sp-action-menu {
             position: fixed;
             z-index: 1060;
-            min-width: 190px;
+            /* cukup lebar untuk teks terpanjang (Set Complete Shipment / Uncomplete Shipment) dalam 1 baris */
+            min-width: 240px;
             background: #fff;
             border: 1px solid #EAECF0;
             border-radius: 14px;
@@ -953,6 +926,7 @@
             color: #344054;
             cursor: pointer;
             text-align: left;
+            white-space: nowrap;
             transition: background .12s ease;
         }
 
@@ -2224,6 +2198,15 @@
             margin-top: 2px;
         }
 
+        /* tombol & modal kalender ETA di samping judul */
+        .sp-title-wrap { display: flex; align-items: center; gap: 10px; }
+        .sp-cal-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid #D0D5DD; border-radius: 10px; background: #fff; color: #344054; font-size: 1.05rem; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
+        .sp-cal-btn:hover { background: #EAF2FF; border-color: #84ADFF; color: #2F6FED; }
+        #modalEtaCalendar .modal-content { display: flex; flex-direction: column; }
+        .sp-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; border-bottom: 1px solid #EAECF0; background: #fff; }
+        .sp-cal-head h5 { font-size: 1rem; font-weight: 700; color: #101828; }
+        .sp-cal-frame { flex: 1; width: 100%; border: 0; background: #f4f3ef; }
+
         .status-badge {
             display: inline-flex;
             align-items: center;
@@ -2247,6 +2230,11 @@
         .status-confirm {
             background: #EAF2FF;
             color: #2F6FED;
+        }
+
+        .status-leave {
+            background: #FFEDD5;
+            color: #EA580C;
         }
 
         .status-plan {
@@ -2773,10 +2761,6 @@
             return day + '/' + month + '/' + year + ' ' + hour + ':' + minute;
         }
 
-        function myparser2(s) {
-            if (!s) {
-                return new Date();
-        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
         // "dd/mm/yyyy HH:mm" -> Date, atau null kalau tidak valid. Jam boleh diketik
         // 14:30, 14.30, atau 1430. Tanggal/jam di luar rentang (mis. 31/02, jam 25) tidak
         // digeser diam-diam ke tanggal lain seperti new Date(), tapi dianggap tidak valid.
@@ -2784,59 +2768,23 @@
             var m = String(s || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2})(?:[:.]?(\d{2}))?(?::\d{2})?)?$/);
             if (!m) {
                 return null;
-        --}}
             }
 
-            // Format: dd/mm/yyyy HH:mm
-            var parts = s.split(' ');
-            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
             var day = parseInt(m[1], 10);
             var month = parseInt(m[2], 10);
             var year = parseInt(m[3], 10);
             var hour = m[4] !== undefined ? parseInt(m[4], 10) : 0;
             var minute = m[5] !== undefined ? parseInt(m[5], 10) : 0;
-            --}}
 
-            var datePart = parts[0];
-            var timePart = parts[1] || '00:00';
-            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
             var d = new Date(year, month - 1, day, hour, minute);
             if (hour > 23 || minute > 59 || d.getDate() !== day || d.getMonth() !== month - 1) {
                 return null;
             }
             return d;
         }
-            --}}
 
-            var dateParts = datePart.split('/');
-            var timeParts = timePart.split(':');
-
-            var day = parseInt(dateParts[0], 10);
-            var month = parseInt(dateParts[1], 10);
-            var year = parseInt(dateParts[2], 10);
-
-            var hour = parseInt(timeParts[0], 10) || 0;
-            var minute = parseInt(timeParts[1], 10) || 0;
-
-            if (
-                !isNaN(day) &&
-                !isNaN(month) &&
-                !isNaN(year)
-            ) {
-                return new Date(
-                    year,
-                    month - 1,
-                    day,
-                    hour,
-                    minute
-                );
-            }
-
-            return new Date();
-        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
         function myparser2(s) {
             return parseDmyHm(s) || new Date();
-        --}}
         }
 
         function myparser3(s) {
@@ -3083,12 +3031,10 @@
             function initGrid() {
                 $('#dgShipmentPlan').datagrid({
                     url: "{{ route('shipplan.getListExportGrouped') }}",
-                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                     // pemuatan pertama ikut checkbox "Tampilkan cancel" (lihat showCancelParam)
                     queryParams: {
                         show_cancel: showCancelParam()
                     },
-                    --}}
                     view: detailview,
                     width: '100%',
                     height: 'auto',
@@ -3305,6 +3251,15 @@
                                         return `<span class="status-badge status-complete"><i class="bi bi-check-circle-fill"></i> Complete</span>`;
                                     }
 
+                                    // Cont Leave: semua container sudah gate out dari pabrik (dicatat Security),
+                                    // tapi shipment belum di-Set Complete
+                                    if (row.is_leave == 1) {
+                                        const at = row.leave_at ?
+                                            `Keluar pabrik ${formatDate(row.leave_at)} ${String(row.leave_at).substring(11, 16)}` :
+                                            'Container sudah keluar pabrik';
+                                        return `<span class="status-badge status-leave" title="${at}"><i class="bi bi-truck"></i> Cont Leave</span>`;
+                                    }
+
                                     if (confirm) {
                                         return `<span class="status-badge status-confirm"><i class="bi bi-hourglass-split"></i> Confirm</span>`;
                                     }
@@ -3323,7 +3278,7 @@
                                 align: 'center',
                                 formatter: function(val, row) {
                                     return `
-                                    <button type="button" class="sp-action-btn pe-4" onclick="event.stopPropagation(); toggleActionMenu(event, ${row.exportpk}, ${row.stsexp}, ${row.lockship}, '${row.endship}', ${row.stscancel}, ${row.stsstart}, '${row.buyer}')">
+                                    <button type="button" class="sp-action-btn pe-4" onclick="event.stopPropagation(); toggleActionMenu(event, ${row.exportpk}, ${row.stsexp}, ${row.lockship}, '${row.endship}', ${row.stscancel}, ${row.stsstart}, '${row.buyer}', ${Number(row.ctn_loaded) || 0}, ${Number(row.ctn_total) || 0}, ${Number(row.ctn_locked) || 0}, ${Number(row.is_segel) || 0}, ${Number(row.is_leave) || 0})">
                                         <i class="bi bi-three-dots-vertical"></i>
                                     </button>
                                 `;
@@ -3503,12 +3458,9 @@
                     status: document.getElementById('spFilterStatus').value || '',
                     searchByRangeDay: $('#filterday').combobox('getValue') || '',
                     searchByRangeEca: $('#filterdayEca').combobox('getValue') || '',
-                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                     show_cancel: showCancelParam(),
-                    --}}
                 });
             };
-        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
 
             // checkbox "Tampilkan cancel": bawaan tidak dicentang (shipment cancel disembunyikan).
             // Filter Status = Cancel Shipment tetap menampilkan yang cancel walau tidak dicentang.
@@ -3528,7 +3480,6 @@
                     if (cb) cb.checked = localStorage.getItem('spShowCancel') === '1';
                 } catch (e) {}
             })();
-        --}}
 
             let searchTimer = null;
             window.onSpSearch = function() {
@@ -3546,9 +3497,7 @@
                     status: document.getElementById('spFilterStatus').value || '',
                     searchByRangeDay: $('#filterday').combobox('getValue') || '',
                     searchByRangeEca: $('#filterdayEca').combobox('getValue') || '',
-                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                     show_cancel: showCancelParam(),
-                    --}}
                 };
 
                 window.location.href = '{{ route('export.excel') }}?' + $.param(params);
@@ -3575,16 +3524,35 @@
             let activeActionBuyer = null;
             let activeActionBtn = null;
 
-            window.toggleActionMenu = function(event, exportpk, stsexp, lockship, endship, stscancel, stsstart, buyer) {
+            window.toggleActionMenu = function(event, exportpk, stsexp, lockship, endship, stscancel, stsstart, buyer,
+                ctnLoaded = 0, ctnTotal = 0, ctnLocked = 0, isSegel = 0, isLeave = 0) {
                 const btn = event.currentTarget;
                 const menu = document.getElementById('spActionMenu');
+
+                // Set Complete Shipment: muncul kalau stuffing 100% (semua carton sudah masuk container) dan belum selesai.
+                // Sudah selesai = semua carton terkunci (status 7) DAN semua container tersegel (status list Complete):
+                // menu disembunyikan. Kalau baru salah satu, menu tetap bisa dijalankan ulang.
+                const stuffingDone = ctnTotal > 0 && ctnLoaded >= ctnTotal;
+                const alreadyComplete = stuffingDone && ctnLocked >= ctnTotal && isSegel == 1;
+                $('#menu_set_complete').toggleClass('d-none', stscancel == 1 || !stuffingDone || alreadyComplete);
+                // Uncomplete Shipment (barang dikembalikan): untuk shipment yang sudah (sebagian) complete;
+                // tidak untuk yang sudah Lock Shipment (sudah diposting ke LPB)
+                const isComplete = isSegel == 1 || ctnLocked > 0;
+                $('#menu_uncomplete').toggleClass('d-none', stscancel == 1 || !isComplete || lockship == 1);
 
                 // Shipment yang sudah di-cancel bersifat read-only: hanya boleh
                 // dilihat / di-export, tidak bisa publish, lock, atau di-cancel lagi.
                 const isCancelled = stscancel == 1;
-                $('#spActionMenu .sp-action-divider').toggleClass('d-none', isCancelled);
-                $('#remove').toggleClass('d-none', isCancelled);
-                $('#menu_add_pono').toggleClass('d-none', isCancelled);
+                // shipment yang sudah Complete tidak bisa di-cancel (Uncomplete dulu kalau barang dikembalikan);
+                // garis pemisah hanya untuk item Cancel Shipment (sama seperti sebelumnya, tidak tampil untuk yang cancel).
+                // Begitu juga yang containernya sudah keluar pabrik (Cont Leave).
+                const hideCancel = isCancelled || isSegel == 1 || isLeave == 1;
+                $('#spActionMenu .sp-action-divider').toggleClass('d-none', hideCancel);
+                $('#remove').toggleClass('d-none', hideCancel);
+                // shipment yang sudah Complete / Cont Leave tidak bisa ditambah PO lagi
+                $('#menu_add_pono').toggleClass('d-none', isCancelled || isSegel == 1 || isLeave == 1);
+                // gabung shipment: tujuan harus aktif, belum Lock Shipment / Complete / keluar pabrik
+                $('#menu_merge').toggleClass('d-none', isCancelled || isSegel == 1 || isLeave == 1 || lockship == 1);
                 $('#cancelled').toggleClass('d-none', !isCancelled);
 
                 if (isCancelled) {
@@ -3640,23 +3608,26 @@
                 activeActionBuyer = buyer;
                 activeActionBtn = btn;
 
-                // hitung posisi tombol, tampilkan menu tepat di bawahnya (rata kanan)
+                // tampilkan menu tepat di bawah tombol (rata kanan); ukuran diambil dari menu yang sudah
+                // tampil (jumlah item berbeda per status), disembunyikan dulu supaya tidak berkedip
                 const rect = btn.getBoundingClientRect();
-                const menuWidth = 200;
+                menu.style.visibility = 'hidden';
+                menu.classList.add('show');
+                const menuWidth = menu.offsetWidth;
+                const menuHeight = menu.offsetHeight;
 
                 let left = rect.right - menuWidth;
                 if (left < 8) left = 8; // jaga jangan sampai keluar layar kiri
 
                 let top = rect.bottom + 6;
                 // kalau menu bakal kepotong di bawah viewport, tampilkan di ATAS tombol
-                const menuHeightEstimate = 180;
-                if (top + menuHeightEstimate > window.innerHeight) {
-                    top = rect.top - menuHeightEstimate - 6;
+                if (top + menuHeight > window.innerHeight - 8) {
+                    top = Math.max(8, rect.top - menuHeight - 6);
                 }
 
                 menu.style.left = left + 'px';
                 menu.style.top = top + 'px';
-                menu.classList.add('show');
+                menu.style.visibility = '';
                 btn.classList.add('active');
             };
 
@@ -3689,10 +3660,20 @@
                         window.open(`{{ url('/export') }}/clp/${exportpk}`, '_blank');
                         break;
                     case 'export_si':
-                        window.open(`{{ url('/export') }}/si/${exportpk}`, '_blank');
+                        // pilih PO / OP dulu (modal), riwayat SI yang sudah di-download diberi tanda
+                        openSiModal(exportpk);
                         break;
                     case 'add_pono':
                         add_po(exportpk, buyer);
+                        break;
+                    case 'merge':
+                        mergeShipment(exportpk, buyer);
+                        break;
+                    case 'set_complete':
+                        setCompleteShipment(exportpk);
+                        break;
+                    case 'uncomplete':
+                        uncompleteShipment(exportpk);
                         break;
                     case 'remove':
                         removeListShipplan(exportpk);
@@ -4128,20 +4109,14 @@
             var dg = $('#dgOrder');
 
             if (!dg.length || !$.data(dg[0], 'datagrid')) {
-                $.messager.alert('Error', 'DataGrid belum siap.', 'error');
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 appAlert('DataGrid belum siap. Muat ulang halaman lalu coba lagi.', { type: 'error' });
-                --}}
                 return;
             }
 
             var rows = dg.datagrid('getChecked');
 
             if (!rows || rows.length === 0) {
-                $.messager.alert('Warning', 'Silakan pilih data terlebih dahulu.', 'warning');
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 appAlert('Silakan pilih data terlebih dahulu.', { type: 'warning', title: 'Belum ada data dipilih' });
-                --}}
                 return;
             }
 
@@ -4447,6 +4422,86 @@
         }
 
         //publish
+        // Set Complete Shipment: semua carton shipment dikunci (pack.status 7) dan PO yang part terakhirnya
+        // session complete (part 10) ditandai selesai (po.sts 1). Diproses sistem Packing lewat
+        // ShipplanController::completeShipment.
+        async function setCompleteShipment(exportpk) {
+            const ok = await appConfirm(
+                'Semua carton di shipment ini akan dikunci (status shipment) dan PO yang sudah session complete ditandai selesai.\nLanjutkan?', {
+                    type: 'question',
+                    title: 'Set Complete Shipment?',
+                    okText: 'Ya, complete',
+                });
+            if (!ok) return;
+
+            try {
+                const res = await fetch("{{ route('shipment-plan.complete-shipment') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        exportpk
+                    }),
+                });
+                let result = {};
+                try {
+                    result = await res.json();
+                } catch (e) {}
+                if (!res.ok) throw new Error(result.message || 'Gagal set complete shipment (status ' + res.status + ').');
+
+                showToast(result.message || 'Shipment complete.', 'success');
+                $('#dgShipmentPlan').datagrid('reload');
+            } catch (err) {
+                appAlert(err.message, {
+                    type: 'error',
+                    title: 'Shipment belum complete'
+                });
+            }
+        }
+
+        // Uncomplete Shipment: kebalikan Set Complete Shipment, dipakai kalau barang yang sudah dikirim dikembalikan.
+        // Carton kembali status 6 (masuk container), PO dibuka lagi (po.sts 0), segel container dikosongkan
+        // sehingga status kembali dari Complete. Diproses lewat ShipplanController::uncompleteShipment.
+        async function uncompleteShipment(exportpk) {
+            const ok = await appConfirm(
+                'Gunakan kalau barang yang sudah dikirim dikembalikan.\nKunci carton dibuka, PO dibuka lagi, dan status shipment kembali dari Complete.', {
+                    type: 'warning',
+                    title: 'Uncomplete Shipment?',
+                    okText: 'Ya, uncomplete',
+                });
+            if (!ok) return;
+
+            try {
+                const res = await fetch("{{ route('shipment-plan.uncomplete-shipment') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        exportpk
+                    }),
+                });
+                let result = {};
+                try {
+                    result = await res.json();
+                } catch (e) {}
+                if (!res.ok) throw new Error(result.message || 'Gagal uncomplete shipment (status ' + res.status + ').');
+
+                showToast(result.message || 'Shipment uncomplete.', 'success');
+                $('#dgShipmentPlan').datagrid('reload');
+            } catch (err) {
+                appAlert(err.message, {
+                    type: 'error',
+                    title: 'Shipment belum di-uncomplete'
+                });
+            }
+        }
+
         function lockship(exportpk) {
             const confirmModalEl = document.getElementById('modalConfirmPublish');
             const confirmModal = new bootstrap.Modal(confirmModalEl);
@@ -4680,20 +4735,14 @@
             var dg = $('#dgShipmentPlan');
 
             if (!dg.length || !$.data(dg[0], 'datagrid')) {
-                $.messager.alert('Error', 'DataGrid belum siap.', 'error');
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 appAlert('DataGrid belum siap. Muat ulang halaman lalu coba lagi.', { type: 'error' });
-                --}}
                 return;
             }
 
             var rows = getCheckedShipPos();
 
             if (!rows || rows.length === 0) {
-                $.messager.alert('Warning', 'Silakan pilih data terlebih dahulu.', 'warning');
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 appAlert('Silakan pilih data terlebih dahulu.', { type: 'warning', title: 'Belum ada data dipilih' });
-                --}}
                 return;
             }
 
@@ -4781,20 +4830,14 @@
             var dg = $('#dgShipmentPlan');
 
             if (!dg.length || !$.data(dg[0], 'datagrid')) {
-                $.messager.alert('Error', 'DataGrid belum siap.', 'error');
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 appAlert('DataGrid belum siap. Muat ulang halaman lalu coba lagi.', { type: 'error' });
-                --}}
                 return;
             }
 
             var rows = getCheckedShipPos();
 
             if (!rows || rows.length === 0) {
-                $.messager.alert('Warning', 'Silakan pilih data terlebih dahulu.', 'warning');
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 appAlert('Silakan pilih data terlebih dahulu.', { type: 'warning', title: 'Belum ada data dipilih' });
-                --}}
                 return;
             }
 
@@ -4933,10 +4976,7 @@
                     if (preset) {
                         $(input).datetimebox('setValue', preset);
                     }
-                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
-                    // jam tiba diisi security saat gate in; di EXIM hanya ditampilkan
-                    $(input).datetimebox('disable');
-                    --}}
+                    // jam tiba bisa diisi / diedit EXIM (juga diisi security saat gate in)
                 } catch (err) {
                     console.error('[shipplan] init datetimebox actcontdate gagal:', err);
                 }
@@ -5172,7 +5212,6 @@
                 slotEl.querySelector('.container-foto-preview').innerHTML = '';
             }
 
-            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
             // tab Container Leave: data keluar dari security (baca saja), dari detail_json -> gate
             const containerGateInfo = new Map(); // uid card -> data gate (jam keluar, dokumentasi, dokumen)
 
@@ -5267,7 +5306,6 @@
                 });
             }
 
-            --}}
             function syncContainerFotoTab() {
                 const fotoList = document.getElementById('containerFotoList');
                 const fotoTemplate = document.getElementById('containerFotoCardTemplate');
@@ -5309,9 +5347,7 @@
                     const arrivalItem = arrivalItems[i];
                     const contnoInput = arrivalItem?.querySelector('[data-field="contno"]');
                     el.querySelector('.container-foto-vessel').textContent = contnoInput?.value || '-';
-                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                     renderGateLeave(el, containerGateInfo.get(sourceItem.dataset.uid));
-                    --}}
 
                     const start_ship = sourceItem.querySelector('[data-field="start_ship"]');
                     const btnfoto = el.querySelector('#btn-camera');
@@ -5568,11 +5604,9 @@
                         containerFotoUrls.set(fotoKey(el.dataset.uid, slot), fotoUrls[slot]);
                     }
                 });
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 if (data && data.gate) {
                     containerGateInfo.set(el.dataset.uid, data.gate);
                 }
-                --}}
 
                 containerList.appendChild(el);
 
@@ -5622,22 +5656,15 @@
                 });
 
 
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 // tanggal & jam bisa diketik langsung atau dipilih dari kalender + spinner jam
-                --}}
                 $('#closetime').datetimebox({
-                    editable: false,
-                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                     editable: true,
                     showSeconds: false,
-                    --}}
                     onChange: function(newValue) {
                         validateAndCorrectCloseTime(newValue);
                     },
                 });
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 bindCloseTimeTyping();
-                --}}
 
                 // kalau ada data pending dari mode edit, isi SEKARANG (widget sudah pasti siap)
                 if (window.__pendingExdateEditData) {
@@ -5678,9 +5705,7 @@
                 containerList.innerHTML = '';
                 containerFotoFiles.clear();
                 containerFotoUrls.clear();
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 containerGateInfo.clear();
-                --}}
                 containerFotoRemoved.clear();
 
                 form.reset();
@@ -5705,9 +5730,7 @@
                 // reset dulu state foto dari sesi sebelumnya
                 containerFotoFiles.clear();
                 containerFotoUrls.clear();
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 containerGateInfo.clear();
-                --}}
                 containerFotoRemoved.clear();
 
                 // dipakai .catch() untuk membedakan gagal ambil data vs gagal merender modal,
@@ -5776,6 +5799,17 @@
                                 $('#fwd').combobox('setValue', data.fwdpk);
                             } else {
                                 forwarderCombo.value = data.fwdpk;
+                            }
+                        }
+
+                        // ekspedisi: kosongkan kalau shipment ini belum punya, supaya pilihan shipment lain tidak terbawa
+                        const ekspedisiCombo = document.getElementById('ekspedisi');
+                        if (ekspedisiCombo) {
+                            const eks = data.ekspedisipk !== undefined && data.ekspedisipk !== null ? data.ekspedisipk : '';
+                            if ($(ekspedisiCombo).data('combobox')) {
+                                $('#ekspedisi').combobox('setValue', eks);
+                            } else {
+                                ekspedisiCombo.value = eks;
                             }
                         }
 
@@ -5988,21 +6022,13 @@
                 if (!minDate || isNaN(minDate.getTime())) return;
                 minDate.setHours(0, 0, 0, 0);
 
-                const closeDate = typeof myparser3 === 'function' ? myparser3(newValue) : new Date(newValue);
-                if (!closeDate || isNaN(closeDate.getTime())) return;
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 // saat diketik, onChange terpanggil di setiap ketikan; validasi ditunda sampai
                 // field ditinggalkan (bindCloseTimeTyping) supaya tidak dikosongkan di tengah mengetik
                 if ($('#closetime').datetimebox('textbox').is(':focus')) return;
                 const closeDate = parseDmyHm(newValue);
                 if (!closeDate) return;
-                --}}
 
                 if (closeDate < minDate) {
-                    isCorrectingCloseTime = true;
-                    $('#closetime').datetimebox('setValue', '');
-                    isCorrectingCloseTime = false;
-                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                     // dikosongkan setelah EasyUI selesai setValue; kalau langsung, EasyUI menimpanya
                     // lagi dengan nilai yang sama dan validasi (serta toast) terjadi dua kali
                     setTimeout(function() {
@@ -6010,11 +6036,9 @@
                         $('#closetime').datetimebox('setValue', '');
                         isCorrectingCloseTime = false;
                     }, 0);
-                    --}}
 
                     showToast('Close Time tidak boleh lebih awal dari Ex-Factory Date.', 'error');
                 }
-            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
             }
 
             // EasyUI tidak merapikan teks yang diketik; tanpa ini "16/10/2026 1430" terkirim
@@ -6049,7 +6073,6 @@
                         isCorrectingCloseTime = false;
                         validateAndCorrectCloseTime(myformatter2(date));
                     });
-            --}}
             }
 
             function convertDateFields(formData, fields) {
@@ -6413,6 +6436,14 @@
             });
         })();
 
+        // KALENDER ETA: halaman kalender Security Gate (?embed=exim) di modal layar penuh; dimuat saat pertama dibuka
+        function openEtaCalendar() {
+            const frame = document.getElementById('etaCalendarFrame');
+            if (!frame.getAttribute('src')) frame.setAttribute('src', frame.dataset.src);
+            const el = document.getElementById('modalEtaCalendar');
+            (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
+        }
+
         //ADD PO
         (function() {
             const csrf = () => document.querySelector('meta[name="csrf-token"]').content;
@@ -6688,6 +6719,433 @@
                 loadList();
             };
         })();
+
+        // SHIPPING INSTRUCTION: pilih PO / OP yang dimasukkan ke SI. PO / OP yang sudah pernah masuk SI
+        // (riwayat export_si_log, lihat ShipplanController::siOptions) diberi tanda SI ke-n + tanggal + user.
+        (function() {
+            let siExportpk = null;
+            let siData = null;
+            const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+            const num = n => new Intl.NumberFormat('id-ID').format(Number(n) || 0);
+            const stateRow = (html, cls = '') => `<tr class="si-state"><td colspan="6" class="${cls}">${html}</td></tr>`;
+
+            function ensureModal() {
+                if (document.getElementById('modalSiPick')) return;
+                document.body.insertAdjacentHTML('beforeend', `
+                    <style>
+                        #modalSiPick .modal-content { border: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 48px rgba(16,24,40,.18); }
+                        #modalSiPick .si-header { display: flex; align-items: flex-start; gap: 14px; padding: 18px 22px 14px; border-bottom: 1px solid #EAECF0; }
+                        #modalSiPick .si-icon { width: 42px; height: 42px; border-radius: 12px; background: #ECFDF3; color: #067647; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+                        #modalSiPick .si-title { margin: 0; font-size: 1.05rem; font-weight: 700; color: #101828; }
+                        #modalSiPick .si-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; margin-right: 4px; padding: 2px 10px; border-radius: 999px; font-size: .74rem; font-weight: 600; background: #F2F4F7; color: #344054; }
+                        #modalSiPick .si-chip-id { background: #EAF2FF; color: #2F6FED; }
+                        #modalSiPick .si-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 22px; background: #FCFCFD; border-bottom: 1px solid #EAECF0; font-size: .8rem; }
+                        #modalSiPick .si-toolbar .btn { font-size: .78rem; padding: 4px 10px; }
+                        #modalSiPick .si-note { margin-left: auto; color: #667085; }
+                        #modalSiPick .si-body { max-height: 56vh; overflow: auto; }
+                        #modalSiPick table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .84rem; }
+                        #modalSiPick thead th { position: sticky; top: 0; z-index: 1; background: #F8F9FC; color: #667085; font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 9px 12px; border-bottom: 1px solid #EAECF0; white-space: nowrap; }
+                        #modalSiPick tbody td { padding: 9px 12px; border-bottom: 1px solid #F2F4F7; vertical-align: top; }
+                        #modalSiPick tr.si-row { cursor: pointer; }
+                        #modalSiPick tr.si-row:hover td { background: #F9FAFB; }
+                        #modalSiPick tr.si-row.is-checked td { background: #ECFDF3; }
+                        #modalSiPick tr.si-row.is-off { cursor: not-allowed; }
+                        #modalSiPick tr.si-row.is-off td { color: #98A2B3; }
+                        #modalSiPick .si-po { font-weight: 700; color: #101828; }
+                        #modalSiPick .si-small { font-size: .75rem; color: #667085; }
+                        #modalSiPick .si-done { display: inline-flex; align-items: center; gap: 4px; margin: 0 4px 3px 0; padding: 2px 8px; border-radius: 999px; background: #FFFAEB; color: #B54708; font-size: .72rem; font-weight: 600; white-space: nowrap; }
+                        #modalSiPick .si-new { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: #F2F4F7; color: #475467; font-size: .72rem; font-weight: 600; }
+                        #modalSiPick .si-state td { text-align: center; color: #667085; padding: 28px 12px; }
+                        #modalSiPick .si-footer { display: flex; align-items: center; gap: 8px; padding: 12px 22px; border-top: 1px solid #EAECF0; background: #FCFCFD; }
+                        #modalSiPick .si-count { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; background: #ECFDF3; color: #067647; font-size: .78rem; font-weight: 700; }
+                    </style>
+                    <div class="modal fade" id="modalSiPick" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content">
+                        <div class="si-header">
+                            <div class="si-icon"><i class="bi bi-file-earmark-richtext"></i></div>
+                            <div class="flex-fill">
+                                <h5 class="si-title">Shipping Instruction</h5>
+                                <span class="si-chip si-chip-id"><i class="bi bi-hash"></i><span id="siIdship">-</span></span>
+                                <span class="si-chip"><i class="bi bi-person-badge"></i> <span id="siBuyer">-</span></span>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="si-toolbar">
+                            <button type="button" class="btn btn-outline-secondary" data-si-pick="all">Pilih semua</button>
+                            <button type="button" class="btn btn-outline-secondary" data-si-pick="new">Pilih yang belum masuk SI</button>
+                            <button type="button" class="btn btn-outline-secondary" data-si-pick="none">Kosongkan</button>
+                            <span class="si-note" id="siNote"></span>
+                        </div>
+                        <div class="si-body">
+                            <table>
+                            <thead><tr>
+                                <th style="width:44px"></th>
+                                <th>PO Number / OP</th>
+                                <th>Style</th>
+                                <th class="text-end">Carton</th>
+                                <th class="text-end">PCS</th>
+                                <th>Status SI</th>
+                            </tr></thead>
+                            <tbody id="siBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="si-footer">
+                            <span class="si-count"><i class="bi bi-check2-square"></i> <span id="siCount">0</span> PO/OP dipilih</span>
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                            <button type="button" class="btn btn-success" id="btnSiDownload" disabled><i class="bi bi-download me-1"></i>Download SI</button>
+                        </div>
+                        </div>
+                    </div>
+                    </div>`);
+
+                const body = document.getElementById('siBody');
+                body.addEventListener('change', updateCount);
+                body.addEventListener('click', e => {
+                    const tr = e.target.closest('tr.si-row');
+                    if (!tr || e.target.closest('input')) return;
+                    const chk = tr.querySelector('.si-chk');
+                    if (!chk || chk.disabled) return;
+                    chk.checked = !chk.checked;
+                    updateCount();
+                });
+                document.querySelectorAll('#modalSiPick [data-si-pick]').forEach(b => b.addEventListener('click', () => {
+                    document.querySelectorAll('#siBody .si-chk:not(:disabled)').forEach(c => {
+                        c.checked = b.dataset.siPick === 'all' || (b.dataset.siPick === 'new' && c.dataset.done === '0');
+                    });
+                    updateCount();
+                }));
+                document.getElementById('btnSiDownload').addEventListener('click', download);
+            }
+
+            const picked = () => Array.from(document.querySelectorAll('#siBody .si-chk:checked')).map(c => c.value);
+
+            function updateCount() {
+                document.querySelectorAll('#siBody .si-chk').forEach(c => c.closest('tr').classList.toggle('is-checked', c.checked));
+                const n = picked().length;
+                document.getElementById('siCount').textContent = n;
+                document.getElementById('btnSiDownload').disabled = n === 0;
+            }
+
+            function render() {
+                const d = siData;
+                const body = document.getElementById('siBody');
+                document.getElementById('siIdship').textContent = d.idship;
+                document.getElementById('siBuyer').textContent = d.buyer || '-';
+                document.getElementById('siNote').textContent = d.tracking
+                    ? (d.batches.length ? `${d.batches.length} SI sudah pernah di-download` : 'Belum ada SI yang di-download')
+                    : 'Riwayat download SI belum aktif (tabel export_si_log belum dibuat)';
+                if (!d.items.length && !d.noCarton.length) {
+                    body.innerHTML = stateRow('<i class="bi bi-inbox me-1"></i> Belum ada PO / carton di shipment ini.');
+                    updateCount();
+                    return;
+                }
+                // key PO / OP => SI yang sudah memuatnya
+                const inSi = {};
+                d.batches.forEach(b => b.keys.forEach(k => (inSi[k] = inSi[k] || []).push(b)));
+                const label = k => k.replace('|', ' / ');
+                body.innerHTML = d.items.map(it => {
+                    const done = inSi[it.key] || [];
+                    const status = done.length
+                        ? done.map(b => {
+                            const others = b.keys.filter(k => k !== it.key);
+                            const title = `SI ke-${b.no} · ${b.at}${b.login ? ' · ' + b.login : ''}` + (others.length ? `\nBersama: ${others.map(label).join(', ')}` : '\nHanya PO / OP ini');
+                            return `<span class="si-done" title="${esc(title)}"><i class="bi bi-check2-circle"></i>SI #${b.no} · ${esc(b.at)}</span>`;
+                        }).join('') + (done.length ? `<div class="si-small">${done.map(b => {
+                            const others = b.keys.filter(k => k !== it.key);
+                            return others.length ? `#${b.no} bersama ${esc(others.map(label).join(', '))}` : `#${b.no} hanya PO / OP ini`;
+                        }).join('<br>')}</div>` : '')
+                        : (d.tracking ? '<span class="si-new">Belum masuk SI</span>' : '<span class="si-small">-</span>');
+                    return `
+                        <tr class="si-row">
+                            <td class="text-center"><input type="checkbox" class="form-check-input si-chk" value="${esc(it.key)}" data-done="${done.length ? 1 : 0}" ${done.length ? '' : 'checked'}></td>
+                            <td><div class="si-po">${esc(it.POno)}</div><div class="si-small">OP ${esc(it.OP)}</div></td>
+                            <td>${esc(it.style)}</td>
+                            <td class="text-end">${num(it.cartons)}</td>
+                            <td class="text-end">${num(it.pcs)}</td>
+                            <td>${status}</td>
+                        </tr>`;
+                }).join('') + d.noCarton.map(it => `
+                        <tr class="si-row is-off" title="Belum ada carton untuk PO / OP ini">
+                            <td class="text-center"><input type="checkbox" class="form-check-input" disabled></td>
+                            <td><div class="si-po">${esc(it.POno)}</div><div class="si-small">OP ${esc(it.OP)}</div></td>
+                            <td>-</td><td class="text-end">-</td><td class="text-end">-</td>
+                            <td><span class="si-small">Belum ada carton</span></td>
+                        </tr>`).join('');
+                updateCount();
+            }
+
+            async function load() {
+                const body = document.getElementById('siBody');
+                body.innerHTML = stateRow('<span class="spinner-border spinner-border-sm me-2"></span>Memuat...');
+                try {
+                    const url = '{{ route('exportSI.options', ['exportpk' => '__ID__']) }}'.replace('__ID__', siExportpk);
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    const json = await res.json().catch(() => ({}));
+                    if (!res.ok || json.success === false) {
+                        body.innerHTML = stateRow(esc(json.message || 'Gagal memuat data.'), 'text-danger');
+                        return;
+                    }
+                    siData = json;
+                    render();
+                } catch (e) {
+                    body.innerHTML = stateRow('Terjadi kesalahan jaringan.', 'text-danger');
+                }
+            }
+
+            function download() {
+                const keys = picked();
+                if (!keys.length) return;
+                const qs = keys.map(k => 'po[]=' + encodeURIComponent(k)).join('&');
+                window.open(`{{ url('/export') }}/si/${siExportpk}?${qs}`, '_blank');
+                // riwayat diperbarui setelah file dibuat di server
+                if (siData && siData.tracking) setTimeout(load, 2500);
+            }
+
+            window.openSiModal = function(exportpk) {
+                ensureModal();
+                siExportpk = exportpk;
+                siData = null;
+                document.getElementById('siIdship').textContent = 'SP' + String(exportpk).padStart(4, '0');
+                document.getElementById('siBuyer').textContent = '-';
+                document.getElementById('siNote').textContent = '';
+                const el = document.getElementById('modalSiPick');
+                (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
+                load();
+            };
+        })();
+
+        // GABUNG SHIPMENT: shipment lain digabung ke shipment ini (tujuan).
+        // PO / OP pindah ke tujuan, carton shipment asal di-unload (pack exportpk / contpk / part = null),
+        // shipment asal jadi Cancel. Diproses ShipplanController::mergeShipment.
+        (function() {
+            let mgsTarget = null;
+            let mgsRows = [];
+            const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+            const num = n => new Intl.NumberFormat('id-ID').format(Number(n) || 0);
+            const stateRow = (html, cls = '') => `<tr class="mgs-state"><td colspan="6" class="${cls}">${html}</td></tr>`;
+
+            function ensureModal() {
+                if (document.getElementById('modalMergeShip')) return;
+                document.body.insertAdjacentHTML('beforeend', `
+                    <style>
+                        #modalMergeShip .modal-content { border: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 48px rgba(16,24,40,.18); }
+                        #modalMergeShip .mgs-header { display: flex; align-items: flex-start; gap: 14px; padding: 18px 22px 14px; border-bottom: 1px solid #EAECF0; }
+                        #modalMergeShip .mgs-icon { width: 42px; height: 42px; border-radius: 12px; background: #F4F3FF; color: #6941C6; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+                        #modalMergeShip .mgs-title { margin: 0; font-size: 1.05rem; font-weight: 700; color: #101828; }
+                        #modalMergeShip .mgs-sub { margin: 2px 0 0; font-size: .8rem; color: #667085; }
+                        #modalMergeShip .mgs-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; font-size: .74rem; font-weight: 600; background: #F2F4F7; color: #344054; }
+                        #modalMergeShip .mgs-chip-id { background: #EAF2FF; color: #2F6FED; }
+                        #modalMergeShip .mgs-toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 22px; background: #FCFCFD; border-bottom: 1px solid #EAECF0; }
+                        #modalMergeShip .mgs-search { position: relative; flex: 1; }
+                        #modalMergeShip .mgs-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #98A2B3; }
+                        #modalMergeShip .mgs-search input { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid #D0D5DD; border-radius: 10px; font-size: .85rem; outline: none; }
+                        #modalMergeShip .mgs-search input:focus { border-color: #84ADFF; box-shadow: 0 0 0 3px rgba(47,111,237,.12); }
+                        #modalMergeShip .mgs-note { margin: 12px 22px 0; padding: 10px 12px; border-radius: 10px; background: #FFFAEB; color: #93370D; font-size: .8rem; }
+                        #modalMergeShip .mgs-body { max-height: 52vh; overflow: auto; margin-top: 12px; border-top: 1px solid #EAECF0; }
+                        #modalMergeShip table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .84rem; }
+                        #modalMergeShip thead th { position: sticky; top: 0; z-index: 1; background: #F8F9FC; color: #667085; font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 9px 12px; border-bottom: 1px solid #EAECF0; white-space: nowrap; }
+                        #modalMergeShip tbody td { padding: 10px 12px; border-bottom: 1px solid #F2F4F7; vertical-align: top; }
+                        #modalMergeShip tr.mgs-row { cursor: pointer; }
+                        #modalMergeShip tr.mgs-row:hover td { background: #F9FAFB; }
+                        #modalMergeShip tr.mgs-row.is-checked td { background: #F4F3FF; }
+                        #modalMergeShip tr.mgs-row.is-blocked { cursor: not-allowed; }
+                        #modalMergeShip tr.mgs-row.is-blocked td { color: #98A2B3; background: #FCFCFD; }
+                        #modalMergeShip .mgs-id { font-weight: 700; color: #101828; }
+                        #modalMergeShip .mgs-small { font-size: .75rem; color: #667085; }
+                        #modalMergeShip .mgs-po { max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                        #modalMergeShip .mgs-tag { display: inline-block; margin-top: 3px; padding: 1px 8px; border-radius: 999px; font-size: .7rem; font-weight: 600; }
+                        #modalMergeShip .mgs-tag-warn { background: #FEF3F2; color: #B42318; }
+                        #modalMergeShip .mgs-tag-info { background: #F2F4F7; color: #475467; }
+                        #modalMergeShip .mgs-state td { text-align: center; color: #667085; padding: 28px 12px; }
+                        #modalMergeShip .mgs-footer { display: flex; align-items: center; gap: 8px; padding: 12px 22px; border-top: 1px solid #EAECF0; background: #FCFCFD; }
+                        #modalMergeShip .mgs-count { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; background: #F4F3FF; color: #6941C6; font-size: .78rem; font-weight: 700; }
+                    </style>
+                    <div class="modal fade" id="modalMergeShip" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                        <div class="mgs-header">
+                            <div class="mgs-icon"><i class="bi bi-intersect"></i></div>
+                            <div class="flex-fill">
+                                <h5 class="mgs-title">Gabung Shipment</h5>
+                                <p class="mgs-sub">Pilih shipment plan yang digabung ke
+                                    <span class="mgs-chip mgs-chip-id"><i class="bi bi-hash"></i><span id="mgsIdship">-</span></span>
+                                    <span class="mgs-chip"><i class="bi bi-person-badge"></i> <span id="mgsBuyer">-</span></span>
+                                </p>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="mgs-toolbar">
+                            <div class="mgs-search">
+                                <i class="bi bi-search"></i>
+                                <input type="text" id="mgsSearch" placeholder="Cari ID shipment (SP0012), PO Number, OP, buyer...">
+                            </div>
+                            <span class="mgs-small" id="mgsTotal"></span>
+                        </div>
+                        <div class="mgs-note"><i class="bi bi-exclamation-triangle me-1"></i>
+                            PO &amp; OP shipment yang dipilih pindah ke shipment ini. Carton yang sudah di-load di container shipment asal <b>otomatis di-unload</b>,
+                            lalu shipment asal menjadi <b>Cancel</b>. Shipment yang carton-nya sudah Complete atau containernya sudah keluar pabrik tidak bisa digabung.
+                        </div>
+                        <div id="mgsError" class="alert alert-danger py-2 mx-4 mt-3 mb-0 d-none"></div>
+                        <div class="mgs-body">
+                            <table>
+                            <thead><tr>
+                                <th style="width:44px"></th>
+                                <th>Shipment</th>
+                                <th>Buyer</th>
+                                <th>PO Number / OP</th>
+                                <th class="text-end">Carton</th>
+                                <th class="text-end">Di container</th>
+                            </tr></thead>
+                            <tbody id="mgsBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="mgs-footer">
+                            <span class="mgs-count"><i class="bi bi-check2-square"></i> <span id="mgsCount">0</span> shipment dipilih</span>
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                            <button type="button" class="btn btn-primary" id="btnMergeShip" disabled>
+                                <span class="spinner-border spinner-border-sm d-none me-1" id="mgsSpin"></span>Gabungkan
+                            </button>
+                        </div>
+                        </div>
+                    </div>
+                    </div>`);
+
+                let t;
+                document.getElementById('mgsSearch').addEventListener('input', () => { clearTimeout(t); t = setTimeout(loadList, 300); });
+                const body = document.getElementById('mgsBody');
+                body.addEventListener('change', updateCount);
+                body.addEventListener('click', e => {
+                    const tr = e.target.closest('tr.mgs-row');
+                    if (!tr || e.target.closest('input')) return;
+                    const chk = tr.querySelector('.mgs-chk');
+                    if (chk.disabled) return;
+                    chk.checked = !chk.checked;
+                    updateCount();
+                });
+                document.getElementById('btnMergeShip').addEventListener('click', save);
+            }
+
+            const selected = () => Array.from(document.querySelectorAll('#mgsBody .mgs-chk:checked')).map(c => mgsRows[c.dataset.i]);
+
+            function updateCount() {
+                document.querySelectorAll('#mgsBody .mgs-chk').forEach(c => c.closest('tr').classList.toggle('is-checked', c.checked));
+                const n = selected().length;
+                document.getElementById('mgsCount').textContent = n;
+                document.getElementById('btnMergeShip').disabled = n === 0;
+            }
+
+            async function loadList() {
+                const body = document.getElementById('mgsBody');
+                const keep = new Set(selected().map(r => r.exportpk));   // pilihan tetap saat mencari
+                body.innerHTML = stateRow('<span class="spinner-border spinner-border-sm me-2"></span>Memuat...');
+                document.getElementById('mgsTotal').textContent = '';
+                const q = encodeURIComponent(document.getElementById('mgsSearch').value.trim());
+                try {
+                    const url = '{{ route('export.merge-candidates', ['exportpk' => '__ID__']) }}'.replace('__ID__', mgsTarget) + '?q=' + q;
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    const json = await res.json().catch(() => ({}));
+                    if (!res.ok || json.success === false) {
+                        body.innerHTML = stateRow(esc(json.message || 'Gagal memuat data.'), 'text-danger');
+                        return;
+                    }
+                    document.getElementById('mgsIdship').textContent = json.idship;
+                    document.getElementById('mgsBuyer').textContent = json.buyer || '-';
+                    mgsRows = json.data || [];
+                    document.getElementById('mgsTotal').textContent = mgsRows.length + ' shipment';
+                    if (!mgsRows.length) {
+                        body.innerHTML = stateRow('<i class="bi bi-inbox me-1"></i> Tidak ada shipment plan lain yang bisa digabung.');
+                        updateCount();
+                        return;
+                    }
+                    body.innerHTML = mgsRows.map((r, i) => `
+                        <tr class="mgs-row ${r.blocked ? 'is-blocked' : ''}" ${r.blocked ? `title="${esc(r.blocked)}"` : ''}>
+                            <td class="text-center"><input type="checkbox" class="form-check-input mgs-chk" data-i="${i}" ${r.blocked ? 'disabled' : ''} ${!r.blocked && keep.has(r.exportpk) ? 'checked' : ''}></td>
+                            <td>
+                                <div class="mgs-id">${esc(r.idship)}</div>
+                                <div class="mgs-small">${r.po_count} PO${r.eca ? ' · ECA ' + esc(String(r.eca).split('-').reverse().join('/')) : ''}</div>
+                                ${r.blocked ? `<span class="mgs-tag mgs-tag-warn"><i class="bi bi-slash-circle"></i> ${esc(r.blocked)}</span>` : ''}
+                            </td>
+                            <td>${esc(r.buyer || '-')}${!r.same_buyer ? '<br><span class="mgs-tag mgs-tag-info">buyer berbeda</span>' : ''}</td>
+                            <td><div class="mgs-po" title="${esc(r.POno)}">${esc(r.POno || '-')}</div><div class="mgs-small mgs-po" title="${esc(r.OP)}">${esc(r.OP || '-')}</div></td>
+                            <td class="text-end">${num(r.totctn)}</td>
+                            <td class="text-end">${r.loaded ? `<b>${num(r.loaded)}</b><div class="mgs-small">akan di-unload</div>` : '<span class="mgs-small">-</span>'}</td>
+                        </tr>`).join('');
+                    updateCount();
+                } catch (e) {
+                    body.innerHTML = stateRow('Terjadi kesalahan jaringan.', 'text-danger');
+                }
+            }
+
+            async function save() {
+                const rows = selected();
+                if (!rows.length) return;
+                const target = document.getElementById('mgsIdship').textContent;
+                const loaded = rows.reduce((a, r) => a + (Number(r.loaded) || 0), 0);
+                const diffBuyer = rows.filter(r => !r.same_buyer).map(r => r.idship);
+                const ok = await appConfirm(
+                    `${rows.map(r => r.idship).join(', ')} akan digabung ke ${target}.\n\n`
+                    + `• PO & OP pindah ke ${target}\n`
+                    + (loaded ? `• ${num(loaded)} carton di container shipment asal di-unload\n` : '')
+                    + `• Shipment asal menjadi Cancel (tidak bisa dibatalkan dari sini)\n`
+                    + (diffBuyer.length ? `• Buyer berbeda (${diffBuyer.join(', ')}) ikut ditambahkan ke buyer ${target}\n` : '')
+                    + `\nLanjutkan?`, {
+                        type: 'warning',
+                        title: 'Gabung shipment?',
+                        okText: 'Ya, gabungkan',
+                    });
+                if (!ok) return;
+
+                const btn = document.getElementById('btnMergeShip');
+                const spin = document.getElementById('mgsSpin');
+                const err = document.getElementById('mgsError');
+                btn.disabled = true;
+                spin.classList.remove('d-none');
+                err.classList.add('d-none');
+                try {
+                    const res = await fetch('{{ route('export.merge') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        },
+                        body: JSON.stringify({ exportpk: mgsTarget, sources: rows.map(r => r.exportpk) }),
+                    });
+                    const json = await res.json().catch(() => ({}));
+                    if (!res.ok || json.success === false) {
+                        err.textContent = json.message || (json.errors ? Object.values(json.errors).flat().join(' ') : 'Gagal menggabung shipment.');
+                        err.classList.remove('d-none');
+                        return;
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('modalMergeShip')).hide();
+                    showToast(json.message, 'success');
+                    reloadSpGrid();
+                } catch (e) {
+                    err.textContent = 'Terjadi kesalahan jaringan.';
+                    err.classList.remove('d-none');
+                } finally {
+                    btn.disabled = selected().length === 0;
+                    spin.classList.add('d-none');
+                }
+            }
+
+            // panggil dari menu row: mergeShipment(exportpk)
+            window.mergeShipment = function(exportpk, buyer) {
+                ensureModal();
+                mgsTarget = exportpk;
+                mgsRows = [];
+                document.getElementById('mgsIdship').textContent = 'SP' + String(exportpk).padStart(4, '0');
+                document.getElementById('mgsBuyer').textContent = buyer || '-';
+                document.getElementById('mgsSearch').value = '';
+                document.getElementById('mgsBody').innerHTML = '';
+                document.getElementById('mgsError').classList.add('d-none');
+                updateCount();
+                const el = document.getElementById('modalMergeShip');
+                (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
+                loadList();
+            };
+        })();
     </script>
     @include('menu.exim-export.shipplan.modal.modalPackingListPdfJs')
 @endsection
@@ -6699,8 +7157,24 @@
 
                 {{-- ================= HEADER ================= --}}
                 <div class="sp-page-header align-items-center">
-                    <div>
+                    <div class="sp-title-wrap">
                         <h4 class="sp-title">Shipment Plan</h4>
+                        {{-- kalender ETA container (sama dengan kalender Security Gate), modal layar penuh --}}
+                        <button type="button" class="sp-cal-btn" onclick="openEtaCalendar()" title="Kalender ETA container" aria-label="Kalender ETA container">
+                            <i class="bi bi-calendar3"></i>
+                        </button>
+                    </div>
+                    <div class="modal fade" id="modalEtaCalendar" tabindex="-1" aria-labelledby="modalEtaCalendarTitle" aria-hidden="true">
+                        <div class="modal-dialog modal-fullscreen">
+                            <div class="modal-content">
+                                <div class="sp-cal-head">
+                                    <h5 class="m-0" id="modalEtaCalendarTitle"><i class="bi bi-calendar3 me-2"></i>Kalender ETA Container</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                                </div>
+                                <iframe id="etaCalendarFrame" class="sp-cal-frame" title="Kalender ETA container"
+                                    data-src="{{ route('security.gate.calendar', ['embed' => 'exim']) }}"></iframe>
+                            </div>
+                        </div>
                     </div>
                     @if ((int) Session::get('userpk', 0) !== 18)
                     <button type="button" class="btn-create-container" onclick="openPackingPlanModal();">
@@ -6743,10 +7217,7 @@
                 </div>
 
                 {{-- ================= TOOLBAR ================= --}}
-                <div class="sp-toolbar align-items-center justify-content-between">
-                {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                 <div class="sp-toolbar justify-content-between">
-                --}}
                     <div class="sp-filters">
                         <div class="sp-search-box">
                             <i class="bi bi-search"></i>
@@ -6810,35 +7281,22 @@
                                 <option value="1">First Plan</option>
                                 <option value="2">Forwarder Confirm</option>
                                 <option value="3">Complete</option>
+                                <option value="5">Cont Leave</option>
                                 <option value="4">Cancel Shipment</option>
                             </select>
                         </div>
 
-                        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
-                        {{-- tampil / sembunyikan shipment cancel; pilihan disimpan per browser (spShowCancel) -- }}
-                        --}}
+                        {{-- tampil / sembunyikan shipment cancel; pilihan disimpan per browser (spShowCancel) --}}
                         <div class="ps-2">
-                            <button type="button" class="sp-refresh-btn" onclick="reloadSpGrid()" title="Muat ulang">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
-                            {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
                             <label class="sp-check" for="spShowCancel" title="Tampilkan shipment plan yang dibatalkan">
                                 <input type="checkbox" id="spShowCancel" onchange="onShowCancelChange()">
                                 <span class="sp-check__box"><i class="bi bi-check-lg"></i></span>
                                 <span>Tampilkan cancel</span>
                             </label>
-                            --}}
-                        </div>
-                        <div class="ps-2">
-                            <button type="button" class="sp-refresh-btn" onclick="exportSpExcel()"
-                                title="Export List Shipment Plan">
-                                <img src="{{ asset('public/css/images/iconExcel.png') }}" alt="Export Excel">
-                            </button>
                         </div>
                     </div>
-        {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
 
-                    {{-- aksi selalu satu kelompok di kanan: muat ulang, export, urutkan -- }}
+                    {{-- aksi selalu satu kelompok di kanan: muat ulang, export, urutkan --}}
                     <div class="sp-toolbar__actions">
                         <button type="button" class="sp-refresh-btn" onclick="reloadSpGrid()" title="Muat ulang">
                             <i class="bi bi-arrow-clockwise"></i>
@@ -6847,51 +7305,48 @@
                             title="Export List Shipment Plan">
                             <img src="{{ asset('public/css/images/iconExcel.png') }}" alt="Export Excel">
                         </button>
-        --}}
 
-                    <!-- SORT -->
-                    <div class="sp-sort dropdown">
-                        <input type="hidden" id="sortlistByDate" name="sortlistByDate" value="11" readonly>
-                        <button type="button" class="sp-sort-btn" data-bs-toggle="dropdown" data-bs-offset="0,8"
-                            aria-expanded="false">
-                            <i class="bi bi-arrow-down-up"></i>
-                            <span id="spSortLabel">Newest entry</span>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end sp-sort-menu">
-                            <li>
-                                <a class="sp-sort-item active" href="javascript:void(0)" data-sort="11" onclick="sortlistByDate(11)">
-                                    <span class="sp-sort-title">Newest entry</span>
-                                    <span class="sp-sort-desc">Shipment plans created most recently first</span>
-                                </a>
-                            </li>
-                            <li>
-                                <a class="sp-sort-item" href="javascript:void(0)" data-sort="12" onclick="sortlistByDate(12)">
-                                    <span class="sp-sort-title">Oldest entry</span>
-                                    <span class="sp-sort-desc">Shipment plans created earliest first</span>
-                                </a>
-                            </li>
-                            <li>
-                                <a class="sp-sort-item" href="javascript:void(0)" data-sort="13" onclick="sortlistByDate(13)">
-                                    <span class="sp-sort-title">Earliest closing due</span>
-                                    <span class="sp-sort-desc">Earliest container closing across the PO's plans</span>
-                                </a>
-                            </li>
-                            <li>
-                                <a class="sp-sort-item" href="javascript:void(0)" data-sort="14" onclick="sortlistByDate(14)">
-                                    <span class="sp-sort-title">Earliest ECA</span>
-                                    <span class="sp-sort-desc">Earliest container arrival date across the plan</span>
-                                </a>
-                            </li>
-                            <li>
-                                <a class="sp-sort-item" href="javascript:void(0)" data-sort="15" onclick="sortlistByDate(15)">
-                                    <span class="sp-sort-title">Most container</span>
-                                    <span class="sp-sort-desc">Plans with the most containers first</span>
-                                </a>
-                            </li>
-                        </ul>
-                    {{-- NONAKTIF SEMENTARA: pembaruan sebelumnya (belum dirilis). Hanya pembaruan packing list yang aktif.
-                    </div>
-                    --}}
+                        <!-- SORT -->
+                        <div class="sp-sort dropdown">
+                            <input type="hidden" id="sortlistByDate" name="sortlistByDate" value="11" readonly>
+                            <button type="button" class="sp-sort-btn" data-bs-toggle="dropdown" data-bs-offset="0,8"
+                                aria-expanded="false">
+                                <i class="bi bi-arrow-down-up"></i>
+                                <span id="spSortLabel">Newest entry</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end sp-sort-menu">
+                                <li>
+                                    <a class="sp-sort-item active" href="javascript:void(0)" data-sort="11" onclick="sortlistByDate(11)">
+                                        <span class="sp-sort-title">Newest entry</span>
+                                        <span class="sp-sort-desc">Shipment plans created most recently first</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="sp-sort-item" href="javascript:void(0)" data-sort="12" onclick="sortlistByDate(12)">
+                                        <span class="sp-sort-title">Oldest entry</span>
+                                        <span class="sp-sort-desc">Shipment plans created earliest first</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="sp-sort-item" href="javascript:void(0)" data-sort="13" onclick="sortlistByDate(13)">
+                                        <span class="sp-sort-title">Earliest closing due</span>
+                                        <span class="sp-sort-desc">Earliest container closing across the PO's plans</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="sp-sort-item" href="javascript:void(0)" data-sort="14" onclick="sortlistByDate(14)">
+                                        <span class="sp-sort-title">Earliest ECA</span>
+                                        <span class="sp-sort-desc">Earliest container arrival date across the plan</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="sp-sort-item" href="javascript:void(0)" data-sort="15" onclick="sortlistByDate(15)">
+                                        <span class="sp-sort-title">Most container</span>
+                                        <span class="sp-sort-desc">Plans with the most containers first</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 
@@ -6916,6 +7371,18 @@
                     </button>
                     <button type="button" id="menu_add_pono" class="sp-action-item" onclick="onActionClick('add_pono')">
                         <i class="bi bi-plus-square"></i> Add PO Number
+                    </button>
+                    {{-- gabung shipment lain ke shipment ini: PO pindah, carton shipment asal di-unload, shipment asal Cancel --}}
+                    <button type="button" id="menu_merge" class="sp-action-item" onclick="onActionClick('merge')">
+                        <i class="bi bi-intersect"></i> Gabung Shipment
+                    </button>
+                    {{-- muncul kalau stuffing 100% (toggleActionMenu); carton -> status 7, PO selesai -> po.sts 1 --}}
+                    <button type="button" id="menu_set_complete" class="sp-action-item d-none" onclick="onActionClick('set_complete')">
+                        <i class="bi bi-check2-circle"></i> Set Complete Shipment
+                    </button>
+                    {{-- barang yang sudah dikirim dikembalikan: carton 7 -> 6, po.sts 1 -> 0, segel container dikosongkan --}}
+                    <button type="button" id="menu_uncomplete" class="sp-action-item d-none" onclick="onActionClick('uncomplete')">
+                        <i class="bi bi-arrow-counterclockwise"></i> Uncomplete Shipment
                     </button>
                     <button type="button" id="menu_publish" class="sp-action-item" onclick="onActionClick('publish')">
                         <i class="bi bi-send-check"></i> Publish
