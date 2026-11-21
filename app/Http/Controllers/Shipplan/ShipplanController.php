@@ -2540,6 +2540,7 @@ class ShipplanController extends Controller
                 // 'export.pebno',
                 'export.nobook',
                 'export.stscancel',
+                'export.remark',   // catatan "Digabung ke SPxxxx" (gabung shipment) -> status Gabung
                 'export.lockship',
                 'export.exdate as extdate',
                 // 'export.actexdate', // dibutuhkan buat hitung status_label
@@ -2649,6 +2650,9 @@ class ShipplanController extends Controller
             $q->whereNull('export.stscancel')
                 ->orWhere('export.stscancel', '<>', 1);
         };
+        // shipment asal hasil Gabung Shipment: di-cancel dengan catatan remark "Digabung ke SPxxxx" (lihat mergedTo)
+        $isMerged = fn($q) => $q->where('export.remark', 'like', '%Digabung ke SP%');
+        $notMerged = fn($q) => $q->where(fn($w) => $w->whereNull('export.remark')->orWhere('export.remark', 'not like', '%Digabung ke SP%'));
 
         if ($status == 1) {
             // PLAN
@@ -2666,17 +2670,32 @@ class ShipplanController extends Controller
             $query->having('is_segel', '=', 1)
                 ->where($notCancelled);
         } elseif ($status == 4) {
-            // CANCEL SHIPMENT
-            $query->where('export.stscancel', 1);
+            // CANCEL SHIPMENT (cancel biasa, bukan hasil gabung)
+            $query->where('export.stscancel', 1)->where($notMerged);
+        } elseif ($status == 6) {
+            // GABUNG: shipment asal yang digabung ke shipment lain (mergeShipment)
+            $query->where('export.stscancel', 1)->where($isMerged);
         } elseif ($status == 5) {
             // CONT LEAVE: semua container sudah keluar pabrik, tapi shipment belum di-Set Complete
             $query->having('is_leave', '=', 1)
                 ->having('is_segel', '=', 0)
                 ->where($notCancelled);
-        } elseif ($request->input('show_cancel') === '0') {
-            // checkbox "Tampilkan cancel" di toolbar tidak dicentang: shipment cancel disembunyikan
-            // (tanpa parameter = semua tampil, seperti sebelumnya)
-            $query->where($notCancelled);
+        } else {
+            // checkbox toolbar "Tampilkan cancel" (cancel biasa) & "Tampilkan gabung" (shipment asal hasil gabung);
+            // tidak dicentang = disembunyikan, tanpa parameter = tampil (seperti sebelumnya)
+            $hideCancel = $request->input('show_cancel') === '0';
+            $hideMerge = $request->input('show_merge') === '0';
+            if ($hideCancel || $hideMerge) {
+                $query->where(function ($q) use ($notCancelled, $notMerged, $isMerged, $hideCancel, $hideMerge) {
+                    $q->where($notCancelled);
+                    if (!$hideCancel) {
+                        $q->orWhere(fn($w) => $w->where('export.stscancel', 1)->where($notMerged));
+                    }
+                    if (!$hideMerge) {
+                        $q->orWhere(fn($w) => $w->where('export.stscancel', 1)->where($isMerged));
+                    }
+                });
+            }
         }
 
         // filter Ex-Factory -> kolom Buyer Ex-Factory (export.GAC)
@@ -2814,6 +2833,8 @@ class ShipplanController extends Controller
             $row->part = $pack->part ?? '-';
 
             // dipakai di kolom "Status" export Excel
+            // shipment asal hasil gabung: di-cancel dengan catatan "Digabung ke SPxxxx" (mergeShipment)
+            $row->merged_to = $this->mergedTo($row);
             $row->status_label = $this->resolveStatusLabel($row);
 
             return $row;
@@ -2822,12 +2843,21 @@ class ShipplanController extends Controller
 
     // turunkan label status dari data row (bukan dari parameter filter),
     // supaya export "semua status" tetap menampilkan status masing-masing baris
+    // ID shipment tujuan kalau shipment ini di-cancel karena digabung (catatan remark dari mergeShipment)
+    private function mergedTo($row): ?string
+    {
+        if ((int) ($row->stscancel ?? 0) !== 1) {
+            return null;
+        }
+        return preg_match_all('/Digabung ke (SP\d+)/', (string) ($row->remark ?? ''), $m) ? end($m[1]) : null;
+    }
+
     private function resolveStatusLabel($row)
     {
         $isCancelled = (int) ($row->stscancel ?? 0) === 1;
 
         if ($isCancelled) {
-            return 'Cancel Shipment';
+            return !empty($row->merged_to) ? 'Gabung ke ' . $row->merged_to : 'Cancel Shipment';
         }
 
         if (!empty($row->is_segel)) {

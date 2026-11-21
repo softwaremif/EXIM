@@ -2247,6 +2247,30 @@
             color: #D92D20;
         }
 
+        /* shipment asal hasil Gabung Shipment: dua baris (Gabung / ke SPxxxx) */
+        .status-merge {
+            background: #F4F3FF;
+            color: #6941C6;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0;
+            padding: 3px 11px;
+            border-radius: 10px;
+            line-height: 1.25;
+        }
+
+        .status-merge__head {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-merge__to {
+            padding-left: 16px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: .72rem;
+        }
+
         .status-empty {
             background: #F1F2F4;
             color: #98A2B3;
@@ -2265,9 +2289,10 @@
             background: #FAFAFA !important;
         }
 
-        /* badge status & tombol aksi tetap terbaca jelas */
-        .sp-row-cancelled td .status-badge,
-        .sp-row-cancelled td .sp-action-btn {
+        /* badge status & tombol aksi tetap terbaca jelas: sel Status & Aksi tidak ikut dipudarkan
+           (opacity sel induk tidak bisa dibatalkan dari elemen di dalamnya) */
+        .sp-row-cancelled td[field="status"],
+        .sp-row-cancelled td[field="action"] {
             opacity: 1;
         }
 
@@ -3033,7 +3058,8 @@
                     url: "{{ route('shipplan.getListExportGrouped') }}",
                     // pemuatan pertama ikut checkbox "Tampilkan cancel" (lihat showCancelParam)
                     queryParams: {
-                        show_cancel: showCancelParam()
+                        show_cancel: showCancelParam(),
+                        show_merge: showMergeParam()
                     },
                     view: detailview,
                     width: '100%',
@@ -3243,6 +3269,11 @@
                                     const complete = row.actexdate;
 
                                     // Cancel adalah status terminal, dicek paling awal.
+                                    // Shipment asal hasil Gabung Shipment: tampil "Gabung -> SP tujuan", bukan Cancelled.
+                                    if (row.stscancel == 1 && row.merged_to) {
+                                        // dua baris supaya ID tujuan tidak terpotong di kolom status yang sempit
+                                        return `<span class="status-badge status-merge" title="Shipment ini digabung ke ${row.merged_to}"><span class="status-merge__head"><i class="bi bi-intersect"></i> Gabung</span><span class="status-merge__to">ke ${row.merged_to}</span></span>`;
+                                    }
                                     if (row.stscancel == 1) {
                                         return `<span class="status-badge status-cancel"><i class="bi bi-x-octagon-fill"></i> Cancelled</span>`;
                                     }
@@ -3278,7 +3309,7 @@
                                 align: 'center',
                                 formatter: function(val, row) {
                                     return `
-                                    <button type="button" class="sp-action-btn pe-4" onclick="event.stopPropagation(); toggleActionMenu(event, ${row.exportpk}, ${row.stsexp}, ${row.lockship}, '${row.endship}', ${row.stscancel}, ${row.stsstart}, '${row.buyer}', ${Number(row.ctn_loaded) || 0}, ${Number(row.ctn_total) || 0}, ${Number(row.ctn_locked) || 0}, ${Number(row.is_segel) || 0}, ${Number(row.is_leave) || 0})">
+                                    <button type="button" class="sp-action-btn pe-4" onclick="event.stopPropagation(); toggleActionMenu(event, ${row.exportpk}, ${row.stsexp}, ${row.lockship}, '${row.endship}', ${row.stscancel}, ${row.stsstart}, '${row.buyer}', ${Number(row.ctn_loaded) || 0}, ${Number(row.ctn_total) || 0}, ${Number(row.ctn_locked) || 0}, ${Number(row.is_segel) || 0}, ${Number(row.is_leave) || 0}, '${row.merged_to || ''}')">
                                         <i class="bi bi-three-dots-vertical"></i>
                                     </button>
                                 `;
@@ -3459,6 +3490,7 @@
                     searchByRangeDay: $('#filterday').combobox('getValue') || '',
                     searchByRangeEca: $('#filterdayEca').combobox('getValue') || '',
                     show_cancel: showCancelParam(),
+                    show_merge: showMergeParam(),
                 });
             };
 
@@ -3474,10 +3506,23 @@
                 } catch (e) {}
                 reloadSpGrid();
             };
+            // checkbox "Tampilkan gabung": shipment asal hasil Gabung Shipment (status Gabung -> SP tujuan)
+            window.showMergeParam = function() {
+                const cb = document.getElementById('spShowMerge');
+                return cb && cb.checked ? '1' : '0';
+            };
+            window.onShowMergeChange = function() {
+                try {
+                    localStorage.setItem('spShowMerge', showMergeParam());
+                } catch (e) {}
+                reloadSpGrid();
+            };
             (function() {
                 const cb = document.getElementById('spShowCancel');
+                const mb = document.getElementById('spShowMerge');
                 try {
                     if (cb) cb.checked = localStorage.getItem('spShowCancel') === '1';
+                    if (mb) mb.checked = localStorage.getItem('spShowMerge') === '1';
                 } catch (e) {}
             })();
 
@@ -3498,6 +3543,7 @@
                     searchByRangeDay: $('#filterday').combobox('getValue') || '',
                     searchByRangeEca: $('#filterdayEca').combobox('getValue') || '',
                     show_cancel: showCancelParam(),
+                    show_merge: showMergeParam(),
                 };
 
                 window.location.href = '{{ route('export.excel') }}?' + $.param(params);
@@ -3525,7 +3571,7 @@
             let activeActionBtn = null;
 
             window.toggleActionMenu = function(event, exportpk, stsexp, lockship, endship, stscancel, stsstart, buyer,
-                ctnLoaded = 0, ctnTotal = 0, ctnLocked = 0, isSegel = 0, isLeave = 0) {
+                ctnLoaded = 0, ctnTotal = 0, ctnLocked = 0, isSegel = 0, isLeave = 0, mergedTo = '') {
                 const btn = event.currentTarget;
                 const menu = document.getElementById('spActionMenu');
 
@@ -3554,6 +3600,10 @@
                 // gabung shipment: tujuan harus aktif, belum Lock Shipment / Complete / keluar pabrik
                 $('#menu_merge').toggleClass('d-none', isCancelled || isSegel == 1 || isLeave == 1 || lockship == 1);
                 $('#cancelled').toggleClass('d-none', !isCancelled);
+                // shipment hasil gabung: "Digabung ke SPxxxx" (bukan "Cancelled")
+                $('#cancelled').html(mergedTo
+                    ? `<i class="bi bi-intersect"></i> Digabung ke ${mergedTo}`
+                    : '<i class="bi bi-x-octagon-fill"></i> Cancelled');
 
                 if (isCancelled) {
                     $('#menu_publish').addClass('d-none');
@@ -7283,6 +7333,7 @@
                                 <option value="3">Complete</option>
                                 <option value="5">Cont Leave</option>
                                 <option value="4">Cancel Shipment</option>
+                                <option value="6">Gabung Shipment</option>
                             </select>
                         </div>
 
@@ -7292,6 +7343,14 @@
                                 <input type="checkbox" id="spShowCancel" onchange="onShowCancelChange()">
                                 <span class="sp-check__box"><i class="bi bi-check-lg"></i></span>
                                 <span>Tampilkan cancel</span>
+                            </label>
+                        </div>
+                        {{-- shipment asal hasil Gabung Shipment; pilihan disimpan per browser (spShowMerge) --}}
+                        <div class="ps-2">
+                            <label class="sp-check" for="spShowMerge" title="Tampilkan shipment plan yang sudah digabung ke shipment lain">
+                                <input type="checkbox" id="spShowMerge" onchange="onShowMergeChange()">
+                                <span class="sp-check__box"><i class="bi bi-check-lg"></i></span>
+                                <span>Tampilkan gabung</span>
                             </label>
                         </div>
                     </div>
