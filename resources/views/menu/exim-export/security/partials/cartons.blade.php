@@ -755,6 +755,9 @@
         if (!n || !(await ask(`Ceklis <b>${n} carton</b>${mifFilter ? ' <b>MIF ' + esc(mifFilter) + '</b>' : ''} yang sudah discan tim stuffing sebagai sudah masuk container?`, 'Ya, ceklis semua'))) return;
         save(mifFilter ? { keys: targets.map(c => c.key), checked: 1 } : { all: 1, checked: 1 });
     });
+    // realtime (index.blade.php): dicolek websocket saat carton container ini berubah -- scan tim
+    // stuffing / ceklis dari HP security lain. Dilewati selagi menyimpan; load() sudah anti dobel.
+    window.sgCartonsReload = () => { if (!busy) load(); };
     load();
 })();
 </script>

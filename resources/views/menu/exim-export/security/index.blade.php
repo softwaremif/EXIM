@@ -1950,5 +1950,71 @@
 <template data-icon-check>@include('menu.exim-export.security.partials.icon', ['name' => 'check'])</template>
 <template data-icon-close>@include('menu.exim-export.security.partials.icon', ['name' => 'close'])</template>
 @include('menu.exim-export.security.partials.stuffing-scan')
+@include('menu.exim-export.security.partials.realtime')
+<script>
+// Realtime websocket (window.ShipRT): event "cont" = container berubah (Security Gate HP lain,
+// mulai / selesai stuffing, shipment plan) -> daftar container & jumlah filter dimuat ulang tanpa
+// reload halaman; event "pack" = carton berubah (scan stuffing) -> ceklis carton container terpilih.
+(function () {
+    const RT = window.ShipRT;
+    const SEL = @json($hasSel ? ['contpk' => (int) $selected->contpk, 'exportpk' => (int) ($selected->exportpk ?? 0)] : null);
+    const timers = {};
+    const later = (key, fn) => { clearTimeout(timers[key]); timers[key] = setTimeout(fn, 200 + Math.random() * 500); };
+    let listBusy = false;
+
+    async function refreshList() {
+        if (listBusy) return;
+        listBusy = true;
+        try {
+            const res = await fetch(location.href, { headers: { 'Accept': 'text/html' }, cache: 'no-store' });
+            if (!res.ok || res.redirected) return; // sesi habis -> biarkan, halaman berikutnya minta login
+            const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+            const cur = document.querySelector('.sg-cards'), next = doc.querySelector('.sg-cards');
+            if (cur && next && cur.innerHTML !== next.innerHTML) cur.innerHTML = next.innerHTML;
+            const nextCounts = doc.querySelectorAll('.sg-chip__count');
+            document.querySelectorAll('.sg-chip__count').forEach((el, i) => {
+                if (nextCounts[i] && el.textContent !== nextCounts[i].textContent) el.textContent = nextCounts[i].textContent;
+            });
+            const badge = document.querySelector('.sg-appbar__badge'), nextBadge = doc.querySelector('.sg-appbar__badge');
+            if (badge && nextBadge) badge.textContent = nextBadge.textContent;
+        } catch (e) {
+        } finally {
+            listBusy = false;
+        }
+    }
+
+    // container yang sedang dibuka diubah di perangkat lain: jangan timpa isian, cukup beri tahu
+    function notifyChanged() {
+        if (document.getElementById('sgRtChanged')) return;
+        const host = document.querySelector('.sg-split__detail .sg-main') || document.querySelector('.sg-split__detail');
+        if (!host) return;
+        const box = document.createElement('div');
+        box.id = 'sgRtChanged';
+        box.className = 'sg-alert sg-alert--warn';
+        box.setAttribute('role', 'status');
+        box.innerHTML = '<div><strong>Data container ini baru diubah di perangkat lain</strong>'
+            + 'Muat ulang supaya yang tampil data terbaru. <button type="button" class="sg-btn" style="margin-top:6px">Muat ulang</button></div>';
+        box.querySelector('button').addEventListener('click', () => location.reload());
+        host.prepend(box);
+    }
+
+    RT.on(function (ev, d) {
+        const mine = SEL && (!d.exportpk || d.exportpk === SEL.exportpk);
+        if (ev === 'pack') {
+            if (mine && window.sgCartonsReload) later('ck', window.sgCartonsReload);
+            return;
+        }
+        if (!d.self) later('list', refreshList);
+        if (mine && window.sgCartonsReload) later('ck', window.sgCartonsReload); // mulai / selesai stuffing ikut mengunci ceklis
+        if (SEL && d.contpk === SEL.contpk && !d.self) notifyChanged();
+    });
+    // baru tersambung lagi setelah putus: kejar perubahan selama offline
+    let wasOn = false;
+    RT.onState(function (on) {
+        if (on && wasOn) later('list', refreshList);
+        wasOn = wasOn || on;
+    });
+})();
+</script>
 </body>
 </html>

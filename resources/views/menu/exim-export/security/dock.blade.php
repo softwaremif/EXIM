@@ -140,6 +140,7 @@
     </main>
 </div>
 
+@include('menu.exim-export.security.partials.realtime')
 <script>
 (function () {
     const csrf = document.querySelector('meta[name="csrf-token"]').content;
@@ -172,6 +173,10 @@
     let touched = false;
     document.addEventListener('change', () => { touched = true; });
     setInterval(() => { if (document.visibilityState === 'visible' && !touched) location.reload(); }, 60000);
+    // realtime websocket: pintu / container berubah di perangkat lain -> papan langsung diperbarui
+    window.ShipRT.on((ev, d) => {
+        if (ev === 'cont' && !d.self && !touched) setTimeout(() => { if (!touched) location.reload(); }, 300 + Math.random() * 700);
+    });
 })();
 </script>
 </body>

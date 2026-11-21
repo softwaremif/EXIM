@@ -120,6 +120,7 @@
     </div>
 </div>
 
+@include('menu.exim-export.security.partials.realtime')
 <script>
 (function () {
     const DATA_URL = @json(route('security.gate.calendar.data'));
@@ -664,6 +665,13 @@
     // data diperbarui otomatis tiap 2 menit selama halaman terlihat
     setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 120000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+    // realtime websocket: container / ETA berubah di EXIM -> kalender langsung diperbarui
+    let rtTimer = null;
+    window.ShipRT.on(ev => {
+        if (ev !== 'cont') return;
+        clearTimeout(rtTimer);
+        rtTimer = setTimeout(refresh, 300 + Math.random() * 700);
+    });
 
     // ---------- tema ----------
     const themeBtn = $('btnTheme');

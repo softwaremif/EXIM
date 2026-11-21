@@ -42,6 +42,18 @@ return [
         'key' => env('PACKING_API_KEY'),
     ],
 
+    // Realtime Security Gate & halaman Shipment packinglist lewat websocket (server laravel-websockets SPS).
+    // channel harus SAMA dengan REALTIME_CHANNEL di packinglist pasangannya; kosong = nonaktif.
+    'realtime' => [
+        'channel' => env('REALTIME_CHANNEL'),
+        'app_id'  => env('REALTIME_APP_ID'),
+        'key'     => env('REALTIME_KEY'),
+        'secret'  => env('REALTIME_SECRET'),
+        'host'    => env('REALTIME_HOST'),
+        'port'    => env('REALTIME_PORT', 6001),
+        'scheme'  => env('REALTIME_SCHEME', 'http'),
+    ],
+
     // laporan packing list (PDF) di aplikasi finishing-packing, dibuka langsung dari browser
     // 'finishing_packing' => [
     //     'url' => env('FINISHING_PACKING_URL', 'http://192.168.0.22/finishing-packing'),
