@@ -4509,7 +4509,7 @@
                         // ekspedisi: kosongkan kalau shipment ini belum punya, supaya pilihan shipment lain tidak terbawa
                         const ekspedisiCombo = document.getElementById('ekspedisi');
                         if (ekspedisiCombo) {
-                            const eks = data.ekspedisipk !== undefined && data.ekspedisipk !== null ? data.ekspedisipk : '';
+                            const eks = data.angpk !== undefined && data.angpk !== null ? data.angpk : '';   // ekspedisi = tabel ang
                             if ($(ekspedisiCombo).data('combobox')) {
                                 $('#ekspedisi').combobox('setValue', eks);
                             } else {

@@ -190,13 +190,13 @@
                                 panelMaxHeight:200
                             ">
                             </div>
-                            {{-- ekspedisi (tabel ekspedisi) -> cont.ekspedisipk, satu pilihan untuk semua container seperti forwarder --}}
+                            {{-- ekspedisi (tabel ang, perusahaan angkutan) -> cont.angpk, satu pilihan untuk semua container seperti forwarder --}}
                             <div class="col-md-6">
                                 <label class="mc-label"><i class="bi bi-truck"></i> Ekspedisi</label>
                                 <input class="easyui-combobox fwd-combo mc-input" name="ekspedisi" id="ekspedisi"
                                     style="width:250px;height:40px;" data-options="
-                                valueField:'ekspedisipk',
-                                textField:'ekspedisinm',
+                                valueField:'angpk',
+                                textField:'angnm',
                                 url:'{{ route('getEkspedisi') }}',
                                 method:'get',
                                 prompt:'Pilih Ekspedisi',

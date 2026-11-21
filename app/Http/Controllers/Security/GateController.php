@@ -1011,16 +1011,16 @@ class GateController extends Controller
             $cols[] = 'cont.' . $col;
         }
 
-        // ekspedisi dipilih EXIM di modal edit shipment plan (cont.ekspedisipk -> ekspedisi), kalau kolomnya sudah ada
-        $withEkspedisi = in_array('ekspedisipk', $this->contColumns(), true);
+        // ekspedisi dipilih EXIM di modal edit shipment plan (cont.angpk -> ang, perusahaan angkutan), kalau kolomnya sudah ada
+        $withEkspedisi = in_array('angpk', $this->contColumns(), true);
         if ($withEkspedisi) {
-            $cols[] = 'ekspedisi.ekspedisinm';
+            $cols[] = DB::raw('TRIM(ang.angnm) AS ekspedisinm');
         }
 
         return DB::table('cont')
             ->join('export', 'export.exportpk', '=', 'cont.exportpk')
             ->leftJoin('fwd', 'fwd.fwdpk', '=', 'cont.fwdpk')
-            ->when($withEkspedisi, fn($q) => $q->leftJoin('ekspedisi', 'ekspedisi.ekspedisipk', '=', 'cont.ekspedisipk'))
+            ->when($withEkspedisi, fn($q) => $q->leftJoin('ang', 'ang.angpk', '=', 'cont.angpk'))
             ->where(fn($q) => $q->whereNull('export.stscancel')->orWhere('export.stscancel', '<>', 1))
             ->when($window, fn($query) => $query->where(function ($q) use ($today) {
                 $q->where(fn($w) => $w->whereNull('cont.actcontdate')

@@ -919,19 +919,21 @@ class ShipplanController extends Controller
         return response()->json($data);
     }
 
-    // kolom cont.ekspedisipk opsional (belum ada di semua database): baca & simpan hanya kalau sudah dibuat
+    // ekspedisi = perusahaan angkutan (tabel ang) -> cont.angpk; kolom opsional (belum ada di semua database):
+    // baca & simpan hanya kalau sudah dibuat
     private function ekspedisiReady(): bool
     {
         static $ready = null;
-        return $ready ?? ($ready = Schema::hasColumn('cont', 'ekspedisipk'));
+        return $ready ?? ($ready = Schema::hasColumn('cont', 'angpk'));
     }
 
-    // pilihan ekspedisi (truk / angkutan) di modal edit shipment plan; disimpan ke cont.ekspedisipk
+    // pilihan ekspedisi di modal edit shipment plan dari tabel ang (nama dirapikan, kolom char berisi spasi)
     public function getEkspedisi()
     {
-        $data = DB::table('ekspedisi')
-            ->select('ekspedisipk', 'ekspedisinm')
-            ->orderBy('ekspedisinm', 'ASC')
+        $data = DB::table('ang')
+            ->selectRaw('angpk, TRIM(angnm) AS angnm')
+            ->whereRaw("TRIM(IFNULL(angnm, '')) <> ''")
+            ->orderByRaw('TRIM(angnm) ASC')
             ->get();
 
         return response()->json($data);
@@ -1246,7 +1248,7 @@ class ShipplanController extends Controller
 
             // ekspedisi dipilih di modal (sama untuk semua container shipment, seperti forwarder)
             if ($this->ekspedisiReady()) {
-                $payload['ekspedisipk'] = ($c['ekspedisi'] ?? $data['ekspedisi'] ?? null) ?: null;
+                $payload['angpk'] = ($c['ekspedisi'] ?? $data['ekspedisi'] ?? null) ?: null;
             }
 
             if (!empty($type)) {
@@ -2256,7 +2258,7 @@ class ShipplanController extends Controller
                 'nopol',
                 'noseal',
                 'actcontdate',
-            ], $gateCols, $this->ekspedisiReady() ? ['ekspedisipk'] : []))
+            ], $gateCols, $this->ekspedisiReady() ? ['angpk'] : []))
             ->get()
             ->map(function ($c) {
                 $c->gate = $this->gateLeaveInfo($c);
@@ -2286,7 +2288,7 @@ class ShipplanController extends Controller
             'nobook'      => $export->nobook,
             'vassalpk'   => $export->vassalpk,
             'fwdpk'      => $containers->first()->fwdpk ?? null,
-            'ekspedisipk' => $containers->first()->ekspedisipk ?? null,
+            'angpk'      => $containers->first()->angpk ?? null,   // ekspedisi (tabel ang)
             'etdvess'    => $export->etdvess,
             'etavess'    => $export->etavess,
             'totqty'    => $export->totqty,
