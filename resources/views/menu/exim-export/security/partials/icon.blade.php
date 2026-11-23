@@ -28,6 +28,7 @@
     @case('logout')<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>@break
     @case('wifi-off')<path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 12.5a10 10 0 0 1 4-2.3M19 12.5a10 10 0 0 0-3-2M12 20v.01"/>@break
     @case('dock')<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>@break
+    @case('upload')<path d="M12 16V4M7 9l5-5 5 5M5 20h14"/>@break
     @case('download')<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>@break
     @case('sidebar')<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>@break
 @endswitch

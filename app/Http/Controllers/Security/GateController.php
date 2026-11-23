@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Security;
 
 use App\Http\Controllers\Controller;
+use App\Services\SimOcr;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -583,6 +584,42 @@ class GateController extends Controller
 
     // data karyawan dari hasil scan ID card (QR berisi karid / NRK)
     // scan ID card / ketik NRK: HRD dulu, lalu harian lepas (hl=1, khusus petugas muat)
+    /**
+     * Baca SIM (OCR Tesseract, App\Services\SimOcr) untuk dialog Foto SIM driver: dari foto yang baru diambil (foto,
+     * belum disimpan) atau foto identitas yang sudah tersimpan. Hasil hanya usulan; security memeriksa sebelum menyimpan.
+     */
+    public function ocrSim(Request $request, $contpk)
+    {
+        $cont = DB::table('cont')->where('contpk', (int) $contpk)->first(['contpk', 'gate_foto_id']);
+        abort_unless($cont, 404, 'Container tidak ditemukan.');
+        if (!SimOcr::available()) {
+            return response()->json(['success' => false, 'message' => 'Pembaca SIM (OCR) belum tersedia di server.'], 503);
+        }
+        if ($request->hasFile('foto')) {
+            $request->validate(['foto' => 'file|image|max:15360'], ['foto.image' => 'File bukan foto.', 'foto.max' => 'Foto terlalu besar (maks 15 MB).']);
+            $path = $request->file('foto')->getRealPath();
+        } else {
+            $file = (string) $cont->gate_foto_id;
+            $path = $this->mediaFolder($cont->contpk) . '/' . $file;
+            if ($file === '' || basename($file) !== $file || !is_file($path)) {
+                return response()->json(['success' => false, 'message' => 'Foto identitas driver belum ada.'], 422);
+            }
+        }
+        try {
+            $r = SimOcr::read($path);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Foto SIM tidak bisa dibaca. Isi data driver manual.'], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'nama'    => $r['nama'],
+            'sim_no'  => $r['sim_no'],
+            'sim_exp' => $r['sim_exp'],
+            'found'   => count(array_filter([$r['nama'], $r['sim_no'], $r['sim_exp']])),
+        ]);
+    }
+
     public function employee(Request $request)
     {
         $v = $request->validate(['karid' => 'required|string|max:100'], ['karid.required' => 'NRK kosong. Scan ulang ID card.']);

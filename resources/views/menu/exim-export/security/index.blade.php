@@ -191,6 +191,23 @@
 @endif
 
 {{-- dialog konfirmasi / pemberitahuan pengganti confirm() & alert() browser; dipakai lewat sgConfirm() / sgAlert() --}}
+{{-- pilih sumber foto / video: ambil langsung (kamera) atau upload file dari galeri; lihat mediaPick di script --}}
+<div class="sg-pick" id="mediaPick" role="dialog" aria-modal="true" aria-labelledby="mediaPickTitle" hidden>
+    <div class="sg-pick__panel">
+        <p class="sg-pick__title" id="mediaPickTitle">Tambah foto</p>
+        <button type="button" class="sg-btn sg-btn--primary sg-btn--lg sg-btn--block" data-pick="camera">
+            <span data-pick-icon="camera">@include('menu.exim-export.security.partials.icon', ['name' => 'camera'])</span>
+            <span data-pick-icon="video" hidden>@include('menu.exim-export.security.partials.icon', ['name' => 'video'])</span>
+            <span data-pick-text="camera">Ambil foto</span>
+        </button>
+        <button type="button" class="sg-btn sg-btn--lg sg-btn--block" data-pick="file">
+            @include('menu.exim-export.security.partials.icon', ['name' => 'upload'])
+            <span data-pick-text="file">Pilih dari galeri / file</span>
+        </button>
+        <button type="button" class="sg-btn sg-btn--ghost sg-btn--block" data-pick="cancel">Batal</button>
+    </div>
+</div>
+
 <div class="sg-dialog" id="sgDialog" data-voice="{{ asset('public/media/voice/universfield-warning-notification-199277.mp3') }}"
     data-voice-missing="{{ asset('public/media/voice/36505577-ui-8-warning-sound-effect-336254.mp3') }}" role="alertdialog" aria-modal="true" aria-labelledby="sgDialogTitle" aria-describedby="sgDialogMsg" hidden>
     <div class="sg-dialog__panel">
@@ -505,6 +522,58 @@
     // dipakai juga script partial (ceklis carton)
     window.sgConfirm = sgConfirm;
     window.sgAlert = sgAlert;
+
+    // ---------- foto / video: pilih ambil langsung (kamera) atau upload file ----------
+    // Semua input file foto / video memakai capture="environment" (langsung kamera). Di HP / tablet, ketukan pada input
+    // ditahan dulu untuk menampilkan pilihan; setelah dipilih, input dibuka lagi dengan / tanpa capture.
+    // Proses setelah file dipilih (kompres, cek durasi video, upload) tetap lewat event change masing-masing input.
+    // Di komputer (tanpa layar sentuh) dialog file langsung terbuka seperti biasa.
+    const pick = document.getElementById('mediaPick');
+    if (pick && window.matchMedia('(pointer: coarse)').matches) {
+        let pickInput = null, pickOpener = null;
+        const closePick = () => {
+            pick.hidden = true;
+            document.body.classList.remove('sg-noscroll');
+            if (pickOpener && document.contains(pickOpener)) pickOpener.focus();
+        };
+        document.addEventListener('click', e => {
+            const input = e.target.closest('input[type=file]');
+            if (!input || input.disabled || input.dataset.pickPass === '1') return;
+            // simpan nilai capture asli (sekali) supaya bisa dipasang / dilepas
+            if (input.dataset.capture === undefined) {
+                if (!input.hasAttribute('capture')) return;   // input tanpa kamera: biarkan
+                input.dataset.capture = input.getAttribute('capture') || 'environment';
+            }
+            e.preventDefault();
+            pickInput = input;
+            pickOpener = input.closest('label') || input;
+            const video = (input.getAttribute('accept') || '').startsWith('video');
+            pick.querySelector('#mediaPickTitle').textContent = input.getAttribute('aria-label') || (video ? 'Tambah video' : 'Tambah foto');
+            pick.querySelector('[data-pick-icon="camera"]').hidden = video;
+            pick.querySelector('[data-pick-icon="video"]').hidden = !video;
+            pick.querySelector('[data-pick-text="camera"]').textContent = video ? 'Rekam video' : 'Ambil foto';
+            pick.querySelector('[data-pick-text="file"]').textContent = video ? 'Pilih video dari galeri / file' : 'Pilih foto dari galeri / file';
+            pick.hidden = false;
+            document.body.classList.add('sg-noscroll');
+            pick.querySelector('[data-pick="camera"]').focus();
+        }, true);
+        pick.addEventListener('click', e => {
+            const btn = e.target.closest('[data-pick]');
+            if (!btn && e.target !== pick) return;
+            const choice = btn ? btn.dataset.pick : 'cancel';
+            const input = pickInput;
+            closePick();
+            pickInput = null;
+            if (!input || choice === 'cancel') return;
+            if (choice === 'camera') input.setAttribute('capture', input.dataset.capture);
+            else input.removeAttribute('capture');
+            // dibuka dari ketukan tombol pilihan (masih dianggap aksi pengguna oleh browser)
+            input.dataset.pickPass = '1';
+            input.click();
+            delete input.dataset.pickPass;
+        });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pick.hidden) { pickInput = null; closePick(); } });
+    }
 
     // ---------- lihat foto besar (a[data-lightbox]); geser antar foto dalam satu [data-gallery] ----------
     // dibuka di halaman ini supaya aplikasi layar penuh tidak pindah ke tab baru; link tetap jadi cadangan.
@@ -1835,6 +1904,7 @@
         const input = tile.querySelector('input[type=file]');
         const bar = tile.querySelector('.sg-progress');
         const hint = tile.querySelector('.sg-upload__hint');
+        if (!input) return;   // identitas driver: lewat dialog Foto SIM
 
         input.addEventListener('change', async () => {
             const file = input.files[0];
@@ -1870,6 +1940,290 @@
             }
         });
     });
+
+    // ---------- Foto SIM driver (dialog #simDlg) ----------
+    // Seperti scan ID card: kamera live, SIM diarahkan ke bingkai; begitu gambar diam, frame dikirim ke server untuk dibaca
+    // (App\Services\SimOcr). Terbaca (no. SIM + nama / masa berlaku) -> foto dibekukan & data terisi; belum -> coba lagi.
+    // Tombol Ambil foto = ambil manual. Tanpa kamera live (HTTP): kamera bawaan / galeri.
+    // Security mencocokkan & memperbaiki -> Simpan: foto diunggah & data masuk ke form.
+    // Sebelum Simpan tidak ada yang tersimpan; Batal membuang foto.
+    const simDlg = document.getElementById('simDlg');
+    const idTile = form.querySelector('[data-sim-open]');
+    if (simDlg && idTile) {
+        const q = sel => simDlg.querySelector(sel);
+        const liveBox = q('[data-sim-live]'), video = liveBox.querySelector('video');
+        const shotBox = q('[data-sim-shot]'), shotImg = shotBox.querySelector('img');
+        const captureBtn = q('[data-sim-capture]'), cameraBtn = q('[data-sim-camera]'), retakeBtn = q('[data-sim-retake]');
+        const statusEl = q('[data-sim-status]'), noteEl = q('[data-sim-note]'), saveBtn = q('[data-sim-save]');
+        const canLive = window.isSecureContext && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+        // field dialog -> field form
+        const FIELDS = { nama: ['simNama', 'gate_driver'], sim_no: ['simNo', 'gate_sim_no'], sim_exp: ['simExp', 'gate_sim_exp'] };
+        const dlgInput = key => document.getElementById(FIELDS[key][0]);
+        let stream = null, shot = null, shotUrl = null, seq = 0, saving = false;
+        // scan otomatis: frame kecil untuk cek gambar diam, jeda antar percobaan baca
+        const probe = document.createElement('canvas');
+        probe.width = 80;
+        probe.height = 60;
+        const probeCtx = probe.getContext('2d', { willReadFrequently: true });
+        let autoTimer = null, reading = false, prevFrame = null, still = 0, nextTry = 0, tries = 0;
+
+        const setStatus = (msg, kind) => {
+            statusEl.textContent = msg || '';
+            statusEl.className = 'sg-scan__status' + (kind ? ' is-' + kind : '');
+        };
+        function fieldError(key, msg) {
+            const field = q(`[data-sim-field="${key}"]`);
+            const hintEl = field.querySelector('.sg-hint');
+            field.classList.toggle('is-error', !!msg);
+            hintEl.hidden = !msg;
+            hintEl.textContent = msg || '';
+        }
+        function markAuto(key, on) {
+            q(`[data-sim-field="${key}"]`).classList.toggle('is-ocr', on);
+            noteEl.hidden = !simDlg.querySelector('.sg-sim__fields .is-ocr');
+        }
+        function stopLive() {
+            clearTimeout(autoTimer);
+            autoTimer = null;
+            liveBox.classList.remove('is-reading');
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            stream = null;
+            video.srcObject = null;
+        }
+        // tampilan: kamera (belum ada foto) atau hasil foto
+        function showCamera() {
+            seq++;
+            shot = null;
+            shotBox.hidden = true;
+            retakeBtn.hidden = true;
+            liveBox.hidden = !canLive;
+            captureBtn.hidden = !canLive;
+            cameraBtn.hidden = canLive;
+            saveBtn.disabled = true;
+            if (!canLive) {
+                // HTTP tanpa izin kamera browser: preview langsung tidak bisa, pakai kamera bawaan tablet
+                setStatus('Preview kamera tidak tersedia di koneksi ini (perlu HTTPS / izin kamera Chrome). Tekan Foto SIM untuk membuka kamera tablet.', 'warn');
+                return;
+            }
+            setStatus('Membuka kamera…');
+            captureBtn.disabled = true;
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })
+                .then(async s => {
+                    if (simDlg.hidden || shot) { s.getTracks().forEach(t => t.stop()); return; }
+                    stream = s;
+                    video.srcObject = s;
+                    await video.play().catch(() => {});
+                    captureBtn.disabled = false;
+                    setStatus('Arahkan kamera ke SIM di dalam bingkai, tahan sebentar. Data terbaca otomatis.');
+                    prevFrame = null;
+                    still = tries = 0;
+                    nextTry = Date.now() + 600;
+                    autoTick();
+                })
+                .catch(err => {
+                    stopLive();
+                    liveBox.hidden = captureBtn.hidden = true;
+                    cameraBtn.hidden = false;
+                    const denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
+                    setStatus(denied ? 'Izin kamera ditolak. Izinkan kamera untuk situs ini di Chrome, atau pakai tombol Foto SIM.'
+                        : 'Kamera tidak bisa dibuka. Pakai tombol Foto SIM.', 'warn');
+                });
+        }
+        // bekukan foto di dialog (kamera dimatikan)
+        function showShot(blob) {
+            stopLive();
+            shot = blob;
+            if (shotUrl) URL.revokeObjectURL(shotUrl);
+            shotUrl = URL.createObjectURL(blob);
+            shotImg.src = shotUrl;
+            shotBox.hidden = false;
+            liveBox.hidden = captureBtn.hidden = cameraBtn.hidden = true;
+            retakeBtn.hidden = false;
+            saveBtn.disabled = false;
+        }
+        // hasil baca -> isian dialog (biru = otomatis); kembalikan jumlah yang terisi
+        function fillFields(r) {
+            let got = 0;
+            Object.keys(FIELDS).forEach(key => {
+                if (!r[key]) return;
+                dlgInput(key).value = r[key];
+                markAuto(key, true);
+                fieldError(key, null);
+                got++;
+            });
+            setStatus(got === 3 ? 'Data SIM terbaca. Cocokkan dengan kartu, lalu Simpan.'
+                : got ? 'Sebagian data terbaca. Lengkapi yang kosong atau Foto ulang, lalu Simpan.'
+                : 'Data SIM tidak terbaca. Isi manual atau Foto ulang lebih dekat.', got === 3 ? null : 'warn');
+            return got;
+        }
+        function readSim(blob) {
+            const fd = new FormData();
+            fd.append('foto', blob, 'sim.jpg');
+            return post(form.dataset.ocrUrl, fd);
+        }
+        function grabFrame() {
+            const c = document.createElement('canvas');
+            c.width = video.videoWidth;
+            c.height = video.videoHeight;
+            c.getContext('2d').drawImage(video, 0, 0);
+            return new Promise(resolve => c.toBlob(resolve, 'image/jpeg', 0.92));
+        }
+        // ambil manual (tombol / kamera bawaan / galeri): langsung dibekukan lalu dibaca
+        async function useShot(file) {
+            const my = ++seq;
+            const blob = await compressImage(file);
+            if (my !== seq) return;
+            showShot(blob);
+            setStatus('Membaca data SIM…');
+            try {
+                const r = await readSim(blob);
+                if (my === seq) fillFields(r);
+            } catch (err) {
+                if (my === seq) setStatus((err.message || 'SIM tidak bisa dibaca.') + ' Isi data manual.', 'warn');
+            }
+        }
+        // scan otomatis: tiap 250 ms bandingkan frame kecil; diam +-0.75 dtk & cukup terang -> kirim ke server
+        function autoTick() {
+            autoTimer = setTimeout(async () => {
+                if (!stream) return;
+                if (!reading && video.readyState >= 2) {
+                    probeCtx.drawImage(video, 0, 0, probe.width, probe.height);
+                    const px = probeCtx.getImageData(0, 0, probe.width, probe.height).data;
+                    const gray = new Uint8Array(px.length / 4);
+                    let sum = 0;
+                    for (let i = 0; i < gray.length; i++) { gray[i] = (px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2]) / 3; sum += gray[i]; }
+                    let diff = 0;
+                    if (prevFrame) for (let i = 0; i < gray.length; i++) diff += Math.abs(gray[i] - prevFrame[i]);
+                    diff = prevFrame ? diff / gray.length : 99;
+                    prevFrame = gray;
+                    still = diff < 7 && sum / gray.length > 40 ? still + 1 : 0;
+                    if (still >= 3 && Date.now() >= nextTry) await autoRead();
+                }
+                if (stream) autoTick();
+            }, 250);
+        }
+        async function autoRead() {
+            const my = seq;
+            reading = true;
+            liveBox.classList.add('is-reading');
+            setStatus('Membaca SIM… tahan posisi kamera.');
+            try {
+                const blob = await compressImage(await grabFrame());
+                const r = await readSim(blob);
+                if (my !== seq || !stream) return;
+                if (r.sim_no && (r.nama || r.sim_exp)) {
+                    showShot(blob);
+                    fillFields(r);
+                    return;
+                }
+                tries++;
+                setStatus(tries >= 3
+                    ? 'SIM belum terbaca. Dekatkan kamera, hindari pantulan cahaya, atau tekan Ambil foto lalu isi manual.'
+                    : 'SIM belum terbaca jelas. Pastikan seluruh kartu di dalam bingkai dan tidak silau.', 'warn');
+            } catch (err) {
+                if (my === seq && stream) setStatus(err.message || 'SIM tidak bisa dibaca. Coba lagi.', 'warn');
+            } finally {
+                reading = false;
+                liveBox.classList.remove('is-reading');
+                still = 0;
+                nextTry = Date.now() + 800;
+            }
+        }
+        function openSim(camera = true) {
+            // data driver yang sudah ada di form jadi isian awal
+            Object.keys(FIELDS).forEach(key => {
+                dlgInput(key).value = document.getElementById(FIELDS[key][1]).value;
+                markAuto(key, false);
+                fieldError(key, null);
+            });
+            simDlg.hidden = false;
+            document.body.classList.add('sg-noscroll');
+            if (camera) showCamera();
+            q('[data-sim-close]').focus();
+        }
+        function closeSim() {
+            if (saving) return;
+            seq++;
+            stopLive();
+            shot = null;
+            if (shotUrl) { URL.revokeObjectURL(shotUrl); shotUrl = null; }
+            shotImg.removeAttribute('src');
+            simDlg.hidden = true;
+            document.body.classList.remove('sg-noscroll');
+            idTile.focus();
+        }
+
+        idTile.addEventListener('click', () => { if (!busy.has(idTile)) openSim(); });
+        idTile.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !busy.has(idTile)) { e.preventDefault(); openSim(); } });
+        simDlg.querySelectorAll('[data-sim-close]').forEach(b => b.addEventListener('click', closeSim));
+        simDlg.addEventListener('click', e => { if (e.target === simDlg) closeSim(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && !simDlg.hidden) closeSim(); });
+        retakeBtn.addEventListener('click', showCamera);
+        // upload foto SIM dari galeri / file (tombol di bawah kotak identitas): langsung ke dialog tanpa kamera
+        const fileBtn = form.querySelector('[data-sim-file]');
+        if (fileBtn) fileBtn.addEventListener('change', () => {
+            const file = fileBtn.files[0];
+            fileBtn.value = '';
+            if (!file || busy.has(idTile)) return;
+            openSim(false);
+            useShot(file);
+        });
+        captureBtn.addEventListener('click', async () => {
+            if (!stream || video.readyState < 2) return;
+            const b = await grabFrame();
+            if (b) useShot(b);
+        });
+        simDlg.querySelectorAll('input[type=file]').forEach(input => input.addEventListener('change', () => {
+            const file = input.files[0];
+            input.value = '';
+            if (file) useShot(file);
+        }));
+        Object.keys(FIELDS).forEach(key => dlgInput(key).addEventListener('input', () => {
+            markAuto(key, false);
+            fieldError(key, null);
+        }));
+        dlgInput('nama').addEventListener('input', e => upperOnInput(e.target));
+
+        saveBtn.addEventListener('click', async () => {
+            if (!shot) return;
+            let bad = false;
+            Object.keys(FIELDS).forEach(key => {
+                const empty = !dlgInput(key).value.trim();
+                fieldError(key, empty ? 'Wajib diisi.' : null);
+                bad = bad || empty;
+            });
+            if (bad) { setStatus('Lengkapi data driver dulu.', 'error'); return; }
+
+            saving = true;
+            setLoading(saveBtn, true);
+            busy.add(idTile);
+            try {
+                const res = await uploadChunked(form.dataset.uploadUrl, chunkSize, 'id', shot,
+                    p => setStatus(`Menyimpan foto · ${Math.round(p * 100)}%`));
+                renderMedia(res);
+                // preview langsung dari foto di perangkat (tidak menunggu diambil ulang dari server)
+                const thumb = idTile.querySelector('.sg-upload__thumb');
+                if (thumb.dataset.localUrl) URL.revokeObjectURL(thumb.dataset.localUrl);
+                thumb.dataset.localUrl = URL.createObjectURL(shot);
+                thumb.src = thumb.dataset.localUrl;
+                thumb.hidden = false;
+                Object.keys(FIELDS).forEach(key => {
+                    const input = document.getElementById(FIELDS[key][1]);
+                    input.value = dlgInput(key).value.trim();
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                saving = false;
+                closeSim();
+            } catch (err) {
+                setStatus(err.message || 'Gagal menyimpan. Coba lagi.', 'error');
+            } finally {
+                saving = false;
+                busy.delete(idTile);
+                setLoading(saveBtn, false);
+            }
+        });
+    }
 
     thumbs.addEventListener('click', async e => {
         const btn = e.target.closest('.sg-thumb__del');

@@ -600,6 +600,8 @@
             <div class="modal-footer cp-footer">
                 <div class="cp-summary">
                     <span id="cpSummaryText">0 carton total</span>
+                    {{-- realtime: Live (websocket) / jam pembaruan terakhir, lihat loadContainerProgress di detail_ship --}}
+                    <span class="cp-live" id="cpLive" hidden></span>
                 </div>
                 <button type="button" class="mc-btn mc-btn-ghost" data-bs-dismiss="modal">Tutup</button>
             </div>

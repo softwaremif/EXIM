@@ -3242,6 +3242,23 @@
             font-weight: 600;
         }
 
+        /* indikator realtime di footer modal progres: Live (websocket) / jam pembaruan terakhir */
+        .cp-live {
+            margin-left: 10px;
+            padding: 2px 9px;
+            border-radius: 999px;
+            background: #F2F4F7;
+            color: #667085;
+            font-size: .74rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .cp-live.is-live {
+            background: #ECFDF3;
+            color: #067647;
+        }
+
         /* ================= VIEW 3D ================= */
         .cp-view-switch {
             margin-left: auto;
@@ -3382,6 +3399,8 @@
 @endsection
 
 @section('js_custom')
+    {{-- websocket realtime (window.ShipRT): colekan "pack" dari Packing List saat carton berubah --}}
+    @include('menu.exim-export.security.partials.realtime')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // cek toast dari sessionStorage (kalau sudah ada dari fitur sebelumnya)
@@ -6418,8 +6437,52 @@
             const cpTooltip = document.getElementById('cpTooltip');
             let cpData = null; // response terakhir containers.progress, dipakai ulang oleh view 3D
             let cpView = 'grid';
+            let cpContpk = null; // container yang sedang dibuka di modal progres
+            let cpOpen = false;
+
+            // ---- realtime: data progres diperbarui tanpa reload ----
+            // websocket (ShipRT, partials/realtime): Packing List mencolek event "pack" setiap carton berubah
+            // (scan stuffing, ceklis security, load / unload); modal memuat ulang datanya sendiri, maks 1x / 2 dtk.
+            // Cadangan selama modal terbuka & tab terlihat: websocket putus -> tiap 15 dtk; tersambung -> tetap tiap 30 dtk,
+            // karena colekan hanya datang dari Packing List yang memakai channel sama (REALTIME_CHANNEL); aksi dari
+            // Packing List lain (mis. produksi dengan channel berbeda) tidak terdengar.
+            const CP_EXPORTPK = {{ (int) $header->exportpk }};
+            const cpLive = document.getElementById('cpLive');
+            let cpRefreshTimer = null, cpLastLoad = 0, cpLoading = false;
+            const cpSyncLive = (at) => {
+                if (!cpLive) return;
+                const live = !!(window.ShipRT && window.ShipRT.connected);
+                cpLive.hidden = !cpOpen;
+                cpLive.classList.toggle('is-live', live);
+                const jam = (at || new Date()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                cpLive.textContent = live ? `● Live · ${jam}` : `Diperbarui ${jam}`;
+                cpLive.title = live ? 'Tersambung realtime (websocket): data berubah otomatis, dicek ulang tiap 30 detik' : 'Realtime tidak tersambung: diperbarui otomatis tiap 15 detik';
+            };
+            const cpScheduleRefresh = () => {
+                if (!cpOpen || !cpContpk) return;
+                clearTimeout(cpRefreshTimer);
+                const wait = Math.max(0, 2000 - (Date.now() - cpLastLoad));
+                cpRefreshTimer = setTimeout(() => loadContainerProgress(cpContpk, true), wait);
+            };
+            if (window.ShipRT) {
+                window.ShipRT.on((ev, d) => {
+                    // colekan shipment lain diabaikan; tanpa exportpk (mis. scan stuffing) -> muat ulang
+                    if (ev !== 'pack' || (d.exportpk && Number(d.exportpk) !== CP_EXPORTPK)) return;
+                    cpScheduleRefresh();
+                });
+                window.ShipRT.onState(() => cpSyncLive());
+            }
+            setInterval(() => {
+                const every = window.ShipRT && window.ShipRT.connected ? 30000 : 15000;
+                if (cpOpen && document.visibilityState === 'visible' && Date.now() - cpLastLoad >= every) cpScheduleRefresh();
+            }, 5000);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && cpOpen && Date.now() - cpLastLoad >= 15000) cpScheduleRefresh();
+            });
 
             window.openContainerProgressModal = function(contpk, contno) {
+                cpContpk = contpk;
+                cpOpen = true;
                 document.getElementById('cpContno').textContent = contno;
                 cpGrid.innerHTML = '';
                 cpLoadingState.classList.remove('d-none');
@@ -6432,7 +6495,11 @@
                 loadContainerProgress(contpk);
             };
 
-            function loadContainerProgress(contpk) {
+            // silent = pembaruan realtime: grid lama tetap tampil sampai data baru datang, gagal tidak mengosongkan grid
+            function loadContainerProgress(contpk, silent = false) {
+                if (silent && cpLoading) return;
+                cpLoading = true;
+                cpLastLoad = Date.now();
                 fetch(`{{ route('containers.progress', ['contpk' => '__CONT_PK__']) }}`.replace('__CONT_PK__',
                         contpk), {
                         headers: {
@@ -6441,16 +6508,21 @@
                     })
                     .then(res => res.json())
                     .then(data => {
+                        // modal sudah ditutup / pindah ke container lain selama menunggu: abaikan
+                        if (!cpOpen || String(contpk) !== String(cpContpk)) return;
                         cpLoadingState.classList.add('d-none');
                         cpData = data;
                         renderCartonGrid(data.cartons || []);
                         if (cpView === '3d') render3d();
+                        cpSyncLive(new Date());
                     })
                     .catch(() => {
+                        if (silent) return;
                         cpLoadingState.classList.add('d-none');
                         cpEmptyState.classList.remove('d-none');
                         cpEmptyState.querySelector('p').textContent = 'Gagal memuat data progres.';
-                    });
+                    })
+                    .finally(() => { cpLoading = false; });
             }
 
             function renderCartonGrid(cartons) {
@@ -7080,6 +7152,10 @@
             progressModalEl.addEventListener('hidden.bs.modal', () => {
                 stopCp3dPlay();
                 hideTooltip();
+                // realtime berhenti saat modal ditutup
+                cpOpen = false;
+                clearTimeout(cpRefreshTimer);
+                cpSyncLive();
             });
             progressModalEl.addEventListener('shown.bs.modal', resizeCp3d);
         })();

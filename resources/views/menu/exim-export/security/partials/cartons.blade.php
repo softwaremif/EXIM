@@ -74,7 +74,7 @@
     @keyframes ck-flash { 0%, 40% { box-shadow: 0 0 0 4px var(--ok); } 100% { box-shadow: none; } }
 
     /* grid tile carton */
-    .ck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: var(--space-2); }
+    .ck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-2); align-content: start; }
     .ck-tile { position: relative; display: flex; flex-direction: column; gap: 2px; min-height: 96px; padding: 9px 10px 8px; border: 1.5px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); cursor: pointer; text-align: left; font: inherit; color: var(--ink); -webkit-tap-highlight-color: transparent; }
     .ck-tile:active { transform: scale(.97); }
     .ck-tile.st-scanned { border-color: var(--info); background: var(--info-soft); }
@@ -83,9 +83,6 @@
     .ck-tile.is-busy { opacity: .45; pointer-events: none; }
     .ck-tile__no { font: 700 18px/22px var(--font-mono); padding-right: 30px; overflow-wrap: anywhere; }
     .ck-tile__meta { font-size: 11.5px; line-height: 15px; color: var(--ink-muted); }
-    .ck-tile__po { padding-right: 26px; font: 500 11.5px/15px var(--font-mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ck-tile__sub { font-size: 11.5px; line-height: 15px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ck-tile__foot { display: flex; align-items: center; gap: 6px; margin-top: auto; padding-top: 3px; font-size: 11.5px; line-height: 15px; color: var(--ink-muted); }
     .ck-mif { display: inline-block; padding: 0 6px; border-radius: var(--radius-pill); border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font: 600 10.5px/16px var(--font-sans); white-space: nowrap; }
     .ck-mif.m2 { border-color: var(--signal); color: var(--signal-ink); background: var(--signal-soft); }
     .ck-mifbar { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-muted); }
@@ -97,6 +94,25 @@
     .st-pending .ck-mark { border: 2px dashed var(--line-strong); background: transparent; cursor: not-allowed; }
     .st-locked .ck-mark, .st-old .ck-mark { cursor: default; }
     @media (max-width: 359px) { .ck-grid { grid-template-columns: 1fr; } }
+    /* kelompok OP / PO / POref (sama dengan daftar carton menu Shipment Packing List), menempel saat discroll */
+    .ck-group { grid-column: 1 / -1; position: sticky; top: calc(-1 * var(--space-3)); z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-1) calc(-1 * var(--space-3)) 0; padding: 7px var(--space-3); background: var(--surface-sunken); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 12.5px; line-height: 17px; }
+    .ck-group:first-child { margin-top: calc(-1 * var(--space-3)); border-top: 0; }
+    .ck-group__title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-muted); }
+    .ck-group__title b { color: var(--ink); font-family: var(--font-mono); font-weight: 600; }
+    .ck-group__prog { display: flex; align-items: center; gap: 8px; flex: none; color: var(--ink-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .ck-bar { width: 64px; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+    .ck-bar span { display: block; height: 100%; background: var(--ok); border-radius: inherit; }
+    /* isi tile: nomor, meta (MIF / jenis / qty), warna, size, status bertitik */
+    .ck-tile__line { display: flex; align-items: center; gap: 4px; font-size: 11.5px; line-height: 15px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ck-tile__line svg { width: 12px; height: 12px; flex: none; color: var(--ink-placeholder); }
+    .ck-tile__line span { overflow: hidden; text-overflow: ellipsis; }
+    .ck-tile__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+    .ck-tile__st { display: flex; align-items: center; gap: 5px; margin-top: auto; padding-top: 3px; font: 600 11.5px/15px var(--font-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-muted); }
+    .ck-tile__st::before { content: ''; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--line-strong); }
+    .st-scanned .ck-tile__st { color: var(--info); } .st-scanned .ck-tile__st::before { background: var(--info); }
+    .st-checked .ck-tile__st, .st-locked .ck-tile__st, .st-old .ck-tile__st { color: var(--ok); }
+    .st-checked .ck-tile__st::before, .st-locked .ck-tile__st::before, .st-old .ck-tile__st::before { background: var(--ok); }
+    .ck-tile__tb { color: #a855f7; font-weight: 700; }
     .ck-empty { text-align: center; color: var(--ink-muted); padding: var(--space-8) var(--space-4); grid-column: 1 / -1; }
 
     .ck-foot { padding: var(--space-2) var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom)); background: var(--surface-raised); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: var(--space-2); }
@@ -395,24 +411,35 @@
         $('ckTabs').innerHTML = TABS.map(([k, l, color]) => `<button type="button" role="tab" class="ck-tab ${tab === k ? 'is-on' : ''}" data-tab="${k}" aria-selected="${tab === k}">${color ? `<i class="ck-dot" style="background:${color}"></i>` : ''}${l}<b>${n[k]}</b></button>`).join('');
         const rows = scope.filter(c => (tab === 'all' || (tab === 'checked' ? DONE.includes(c.state) : c.state === tab))
             && (!q || [c.carton, c.nobar, mifOf(c), ...(c.po_op || []), ...(c.colors || []), ...(c.members || []), ...(c.buyer || []), ...(c.style || [])].join(' ').toLowerCase().includes(q)));
+        // dikelompokkan per OP / PO / POref seperti daftar carton menu Shipment (Packing List);
+        // carton gabungan (Mix lintas PO / Bundle) di kelompok sendiri paling bawah
+        const groupOf = c => {
+            if (c.type === 'mix' || c.type === 'bundle') return { key: '~' + c.type, title: c.type === 'mix' ? '<b>Carton Mix</b> (lintas PO)' : '<b>Carton besar</b> (Bundle)' };
+            const p = (c.pos || [])[0] || {};
+            return {
+                key: [p.OP || '', p.POno || '', p.poref || ''].join('|'),
+                title: `OP <b>${esc(p.OP || '-')}</b> · PO <b>${esc(p.POno || '-')}</b>` + (p.poref && p.poref !== '-' ? ` · POref <b>${esc(p.poref)}</b>` : ''),
+            };
+        };
+        const coll = new Intl.Collator('id', { numeric: true, sensitivity: 'base' });
+        rows.sort((a, b) => coll.compare(groupOf(a).key, groupOf(b).key) || coll.compare(String(a.carton), String(b.carton)));
         lastRows = rows;
+        // progres kelompok dihitung dari semua carton (sesuai filter MIF), bukan hanya tab yang tampil
+        const prog = {};
+        scope.forEach(c => { const k = groupOf(c).key; prog[k] = prog[k] || { done: 0, total: 0 }; prog[k].total++; if (DONE.includes(c.state)) prog[k].done++; });
         // buang pilihan yang statusnya sudah berubah / tidak ada lagi
         [...picked].forEach(k => { if (!pickable(cartonBy(k))) picked.delete(k); });
+        let lastGroup = null;
         $('ckGrid').innerHTML = rows.length ? rows.map(c => {
-            const kind = c.type === 'bundle' ? `Besar·${c.members.length}` : (c.type === 'mix' ? 'Mix' : '');
-            const when = c.state === 'scanned' ? time(c.cekdate1) : (c.cekdate2 ? time(c.cekdate2) : '');
-            const markable = !locked && (c.state === 'scanned' || c.state === 'checked');
-            const pos = c.pos || [];
-            const refs = [...new Set(pos.map(p => p.poref).filter(Boolean))];
-            const pickCls = selectMode ? (pickable(c) ? ' is-pickable' : '') + (picked.has(c.key) ? ' is-picked' : '') : '';
-            return `<div class="ck-tile st-${c.state}${pickCls}" role="button" tabindex="0" data-key="${esc(c.key)}" aria-label="Carton ${esc(c.carton)}, ${STATE[c.state]}"${selectMode ? ` aria-pressed="${picked.has(c.key)}"` : ''}
-                    title="${esc(pos.map(p => poText(p) + (p.poref ? ' · ' + p.poref : '')).join('\n'))}">
-                <span class="ck-tile__no">${esc(c.carton)}</span>
-                <span class="ck-tile__po">${pos.length ? esc(poText(pos[0])) + (pos.length > 1 ? ` <b>+${pos.length - 1}</b>` : '') : '-'}</span>
-                <span class="ck-tile__sub">${esc(refs.join(', ') || '-')}${(c.colors || []).length ? ' · ' + esc(c.colors.join(', ')) : ''}</span>
-                <span class="ck-tile__foot">${(c.mif || []).map(m => `<span class="ck-mif ${m === '2' ? 'm2' : ''}">MIF ${esc(m)}</span>`).join('')}${kind ? `<span class="ck-tile__kind">${kind}</span>` : ''}<span title="Aktual ${c.pcs} / plan ${c.pcsp || '-'} pcs">${qty(c.pcs, c.pcsp)} pcs${when ? ' · ' + when : ''}</span></span>
-                <button type="button" class="ck-mark" data-mark ${markable ? '' : 'disabled'} aria-label="${c.state === 'scanned' ? 'Ceklis' : 'Batalkan ceklis'} carton ${esc(c.carton)}">${CHECK_ICON}</button>
-            </div>`;
+            const g = groupOf(c);
+            let head = '';
+            if (g.key !== lastGroup) {
+                lastGroup = g.key;
+                const pg = prog[g.key] || { done: 0, total: 0 };
+                head = `<div class="ck-group"><span class="ck-group__title">${g.title}</span>
+                    <span class="ck-group__prog"><span class="ck-bar"><span style="width:${pg.total ? Math.round(pg.done / pg.total * 100) : 0}%"></span></span>${pg.done}/${pg.total}</span></div>`;
+            }
+            return head + tileHtml(c, locked);
         }).join('') : `<div class="ck-empty">${q ? 'Tidak ada carton yang cocok.' : (tab === 'scanned' ? 'Belum ada carton yang discan tim stuffing.' : 'Tidak ada carton.')}</div>`;
         const all = $('ckAll');
         all.hidden = locked || !n.scanned || selectMode;
@@ -420,6 +447,31 @@
         if (locked && selectMode) selectMode = false;
         $('ckSelect').hidden = locked;
         renderSel();
+    }
+
+    // tile carton (susunan seperti tile daftar carton menu Shipment Packing List):
+    // nomor, MIF / jenis / qty, warna, size, status bertitik + waktu; tombol ceklis di pojok
+    const ICON_COLOR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1.3"/><circle cx="12" cy="7.5" r="1.3"/><circle cx="15.5" cy="10" r="1.3"/><path d="M12 21a3 3 0 0 1 0-6h1.5a2 2 0 0 0 0-4"/></svg>';
+    const ICON_SIZE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 15l12-12 6 6-12 12z"/><path d="M7 11l2 2M10 8l2 2M13 5l2 2"/></svg>';
+    function tileHtml(c, locked) {
+        const kind = c.type === 'bundle' ? `Besar·${(c.members || []).length}` : (c.type === 'mix' ? 'Mix' : '');
+        const when = c.state === 'scanned' ? time(c.cekdate1) : (c.cekdate2 ? time(c.cekdate2) : '');
+        const markable = !locked && (c.state === 'scanned' || c.state === 'checked');
+        const pos = c.pos || [];
+        const colors = (c.colors || []).join(', ');
+        const sizes = (c.sizes || []).map(z => `${z.label}:${z.qty}`).join(' ');
+        const pickCls = selectMode ? (pickable(c) ? ' is-pickable' : '') + (picked.has(c.key) ? ' is-picked' : '') : '';
+        const tip = [`Carton ${c.carton} · ${STATE[c.state]}`, ...pos.map(p => poText(p) + (p.poref ? ' · ' + p.poref : '')),
+            colors ? 'Warna: ' + colors : '', sizes ? 'Size: ' + sizes : ''].filter(Boolean).join('\n');
+        return `<div class="ck-tile st-${c.state}${pickCls}" role="button" tabindex="0" data-key="${esc(c.key)}" aria-label="Carton ${esc(c.carton)}, ${STATE[c.state]}"${selectMode ? ` aria-pressed="${picked.has(c.key)}"` : ''} title="${esc(tip)}">
+                <span class="ck-tile__no">${esc(c.carton)}</span>
+                <span class="ck-tile__meta">${(c.mif || []).map(m => `<span class="ck-mif ${m === '2' ? 'm2' : ''}">MIF ${esc(m)}</span>`).join('')}${kind ? `<span class="ck-tile__kind">${kind}</span>` : ''}<span title="Aktual ${c.pcs} / plan ${c.pcsp || '-'} pcs">${qty(c.pcs, c.pcsp)} pcs</span>${c.nobar ? '' : '<span class="ck-tile__tb" title="Tanpa barcode">TB</span>'}</span>
+                ${c.type === 'mix' && pos.length ? `<span class="ck-tile__line">${esc(pos.map(poText).join(' / '))}</span>` : ''}
+                ${colors ? `<span class="ck-tile__line">${ICON_COLOR}<span>${esc(colors)}</span></span>` : ''}
+                ${sizes ? `<span class="ck-tile__line">${ICON_SIZE}<span>${esc(sizes)}</span></span>` : ''}
+                <span class="ck-tile__st">${STATE[c.state]}${when ? ' · ' + when : ''}</span>
+                <button type="button" class="ck-mark" data-mark ${markable ? '' : 'disabled'} aria-label="${c.state === 'scanned' ? 'Ceklis' : 'Batalkan ceklis'} carton ${esc(c.carton)}">${CHECK_ICON}</button>
+            </div>`;
     }
 
     // ---------- mode pilih: ceklis / batal ceklis massal ----------

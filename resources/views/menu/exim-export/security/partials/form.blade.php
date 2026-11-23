@@ -29,6 +29,7 @@
     data-store-url="{{ route('security.gate.store', $s->contpk) }}"
     data-update-url="{{ route('security.gate.update', $s->contpk) }}"
     data-upload-url="{{ route('security.gate.upload', $s->contpk) }}"
+    data-ocr-url="{{ route('security.gate.ocr-sim', $s->contpk) }}"
     data-delete-url="{{ route('security.gate.media-delete', $s->contpk) }}"
     data-chunk="{{ $chunkSize }}">
 
@@ -143,17 +144,21 @@
             <div class="sg-field">
                 <span class="sg-label">Foto identitas driver <span class="sg-req">*</span></span>
                 <div class="sg-uploads sg-uploads--pair">
-                    {{-- identitas driver: 1 foto, ganti menimpa --}}
-                    <label class="sg-upload {{ $s->gate_foto_id ? 'is-done' : '' }}" data-upload="id">
+                    {{-- identitas driver: 1 foto, ganti menimpa; diambil lewat dialog Foto SIM (#simDlg) --}}
+                    <div class="sg-upload {{ $s->gate_foto_id ? 'is-done' : '' }}" data-upload="id" data-sim-open role="button" tabindex="0" aria-label="Foto SIM driver">
                         <img class="sg-upload__thumb" alt="" src="{{ $media($s->gate_foto_id) }}" {{ $s->gate_foto_id ? '' : 'hidden' }}>
                         @include('menu.exim-export.security.partials.icon', ['name' => 'id', 'class' => 'sg-icon--lg'])
                         <span class="sg-upload__title">Identitas driver</span>
                         <span class="sg-progress" hidden><span></span></span>
-                        <span class="sg-upload__hint" data-hint="KTP atau SIM, 1 foto">KTP atau SIM, 1 foto</span>
+                        <span class="sg-upload__hint" data-hint="Foto SIM, data driver terbaca otomatis">Foto SIM, data driver terbaca otomatis</span>
                         <span class="sg-upload__bar">@include('menu.exim-export.security.partials.icon', ['name' => 'check']) Tersimpan<span>Ganti</span></span>
-                        <input type="file" accept="image/*" capture="environment">
-                    </label>
+                    </div>
                 </div>
+                {{-- foto SIM yang sudah ada (galeri / file): dibuka di dialog Foto SIM untuk dibaca & diperiksa dulu --}}
+                <label class="sg-btn sg-btn--sm sg-sim__upload">
+                    @include('menu.exim-export.security.partials.icon', ['name' => 'upload']) Upload foto dari galeri / file
+                    <input class="sg-scan__file" type="file" accept="image/*" data-sim-file>
+                </label>
             </div>
         </section>
     </div>
@@ -288,4 +293,57 @@
         <button type="button" class="sg-btn sg-btn--lg" id="btnDraft">Simpan draft</button>
         <button type="button" class="sg-btn sg-btn--primary sg-btn--lg" id="btnSubmit">Simpan kedatangan</button>
     @endif
+</div>
+
+{{-- Foto SIM driver: ambil foto -> data dibaca otomatis (OCR server) -> security periksa / koreksi -> Simpan.
+     Foto & data baru masuk ke form setelah Simpan. Kamera live hanya di HTTPS; di HTTP pakai kamera bawaan. --}}
+<div class="sg-scan sg-sim" id="simDlg" role="dialog" aria-modal="true" aria-labelledby="simTitle" hidden>
+    <div class="sg-scan__panel">
+        <div class="sg-scan__head">
+            <h2 class="sg-scan__title" id="simTitle">Foto SIM driver<small>Arahkan kamera ke SIM, periksa datanya, lalu simpan</small></h2>
+            <button type="button" class="sg-btn sg-btn--ghost sg-btn--icon" data-sim-close aria-label="Tutup">@include('menu.exim-export.security.partials.icon', ['name' => 'close'])</button>
+        </div>
+        <div class="sg-sim__view" data-sim-live hidden>
+            <video playsinline muted></video>
+            <span class="sg-sim__frame"></span>
+        </div>
+        <figure class="sg-sim__shot" data-sim-shot hidden><img alt="Foto SIM driver"></figure>
+        <div class="sg-sim__actions">
+            <button type="button" class="sg-btn sg-btn--primary sg-btn--lg" data-sim-capture hidden>@include('menu.exim-export.security.partials.icon', ['name' => 'camera']) Ambil foto</button>
+            <label class="sg-btn sg-btn--primary sg-btn--lg" data-sim-camera hidden>
+                @include('menu.exim-export.security.partials.icon', ['name' => 'camera']) Foto SIM
+                <input class="sg-scan__file" type="file" accept="image/*" capture="environment" data-pick-pass="1">
+            </label>
+            <button type="button" class="sg-btn sg-btn--lg" data-sim-retake hidden>@include('menu.exim-export.security.partials.icon', ['name' => 'refresh']) Foto ulang</button>
+            <label class="sg-btn sg-btn--lg" data-sim-gallery>
+                @include('menu.exim-export.security.partials.icon', ['name' => 'upload']) Galeri
+                <input class="sg-scan__file" type="file" accept="image/*">
+            </label>
+        </div>
+        <p class="sg-scan__status" data-sim-status role="status"></p>
+        <div class="sg-sim__fields">
+            <div class="sg-field" data-sim-field="nama">
+                <label class="sg-label" for="simNama">Nama driver <span class="sg-req">*</span></label>
+                <input class="sg-input" id="simNama" autocomplete="off">
+                <span class="sg-hint" hidden></span>
+            </div>
+            <div class="sg-grid2">
+                <div class="sg-field" data-sim-field="sim_no">
+                    <label class="sg-label" for="simNo">No. SIM <span class="sg-req">*</span></label>
+                    <input class="sg-input sg-mono" id="simNo" inputmode="numeric" autocomplete="off">
+                    <span class="sg-hint" hidden></span>
+                </div>
+                <div class="sg-field" data-sim-field="sim_exp">
+                    <label class="sg-label" for="simExp">Masa berlaku SIM <span class="sg-req">*</span></label>
+                    <input class="sg-input" type="date" id="simExp">
+                    <span class="sg-hint" hidden></span>
+                </div>
+            </div>
+            <p class="sg-sim__note" data-sim-note hidden>Kolom biru dibaca otomatis dari foto. Cocokkan dengan SIM, perbaiki bila salah.</p>
+        </div>
+        <div class="sg-sim__foot">
+            <button type="button" class="sg-btn sg-btn--lg" data-sim-close>Batal</button>
+            <button type="button" class="sg-btn sg-btn--primary sg-btn--lg" data-sim-save disabled>Simpan</button>
+        </div>
+    </div>
 </div>

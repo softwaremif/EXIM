@@ -130,6 +130,8 @@ Route::middleware(['check'])->group(function () {
     Route::get('/security/gate/dock', [GateDoorController::class, 'board'])->name('security.gate.dock');
     Route::post('/security/gate/{contpk}/draft', [GateController::class, 'draft'])->name('security.gate.draft');
     Route::post('/security/gate/{contpk}/upload', [GateController::class, 'upload'])->name('security.gate.upload');
+    // baca SIM dari foto identitas driver (OCR) -> usulan nama / no. SIM / masa berlaku di form Gate In
+    Route::post('/security/gate/{contpk}/ocr-sim', [GateController::class, 'ocrSim'])->name('security.gate.ocr-sim');
     Route::post('/security/gate/{contpk}/media-delete', [GateController::class, 'deleteFoto'])->name('security.gate.media-delete');
     Route::post('/security/gate/{contpk}/out', [GateController::class, 'checkout'])->name('security.gate.out');
     Route::post('/security/gate/{contpk}/update', [GateController::class, 'update'])->name('security.gate.update');
