@@ -45,7 +45,7 @@
             @if ($video)
                 <div class="sg-orow {{ $m['out_video'] ? 'is-done' : '' }}" data-out-upload="out_video">
                     <div class="sg-orow__head">
-                        <span class="sg-orow__title"><span class="sg-upload__title">Video dokumentasi seal</span><span class="sg-req">*</span></span>
+                        <span class="sg-orow__title"><span class="sg-upload__title">Video seal sudah terpasang dengan baik</span><span class="sg-req">*</span></span>
                         <span class="sg-count {{ $m['out_video'] ? 'is-done' : '' }}" data-video-state>{{ $m['out_video'] ? 'Tersimpan' : 'Belum ada' }}</span>
                     </div>
                     <span class="sg-upload__hint" data-hint="Pemasangan seal, maks 60 detik">Pemasangan seal, maks 60 detik</span>
@@ -57,7 +57,7 @@
                         <label class="sg-orow__add">
                             @include('menu.exim-export.security.partials.icon', ['name' => 'video'])
                             <span data-video-add>{{ $m['out_video'] ? 'Ganti' : 'Rekam' }}</span>
-                            <input type="file" accept="video/*" capture="environment" aria-label="Rekam video dokumentasi seal">
+                            <input type="file" accept="video/*" capture="environment" aria-label="Rekam video seal sudah terpasang dengan baik">
                         </label>
                     </div>
                 </div>

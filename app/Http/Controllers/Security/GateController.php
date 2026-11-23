@@ -955,7 +955,7 @@ class GateController extends Controller
             }
         }
         if (!$media['out_video']) {
-            $missing['out_media'][] = 'Rekam video dokumentasi seal.';
+            $missing['out_media'][] = 'Rekam video seal sudah terpasang dengan baik.';
         }
         if ($missing) {
             throw ValidationException::withMessages($missing);

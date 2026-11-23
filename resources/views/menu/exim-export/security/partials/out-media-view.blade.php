@@ -22,7 +22,7 @@
         @if ($video)
             <div class="sg-orow sg-orow--view">
                 <div class="sg-orow__head">
-                    <span class="sg-orow__title"><span class="sg-upload__title">Video dokumentasi seal</span></span>
+                    <span class="sg-orow__title"><span class="sg-upload__title">Video seal sudah terpasang dengan baik</span></span>
                     <span class="sg-count {{ $m['out_video'] ? 'is-done' : '' }}">{{ $m['out_video'] ? 'Ada' : 'Tidak ada' }}</span>
                 </div>
                 @if ($m['out_video'])

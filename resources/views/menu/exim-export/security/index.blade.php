@@ -1157,7 +1157,7 @@
             field: field.dataset.field,
             missing: () => required()
                 .filter(t => !t.classList.contains('is-done'))
-                .map(t => t.dataset.outUpload === 'out_video' ? 'Rekam video dokumentasi seal.' : `Ambil foto ${t.querySelector('.sg-upload__title').firstChild.textContent.trim()}.`),
+                .map(t => t.dataset.outUpload === 'out_video' ? 'Rekam video seal sudah terpasang dengan baik.' : `Ambil foto ${t.querySelector('.sg-upload__title').firstChild.textContent.trim()}.`),
         };
     }
 
