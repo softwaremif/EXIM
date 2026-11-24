@@ -322,6 +322,44 @@
         });
     }
 
+    // ---------- pencarian langsung saat mengetik (sebelumnya hanya jalan saat Enter, dan tombol x
+    // tidak memuat ulang daftar). Daftar kartu + chip (jumlah & link yang membawa q) diganti tanpa
+    // reload halaman supaya fokus & keyboard di HP tidak hilang.
+    const searchForm = document.querySelector('form[role="search"]');
+    const searchInput = searchForm && searchForm.querySelector('input[name="q"]');
+    if (searchInput) {
+        let searchTimer = null, searchSeq = 0;
+        const runSearch = async () => {
+            const seq = ++searchSeq;
+            const url = new URL(location.href);
+            const q = searchInput.value.trim();
+            if (q) url.searchParams.set('q', q); else url.searchParams.delete('q');
+            try {
+                const res = await fetch(url, { headers: { 'Accept': 'text/html' }, cache: 'no-store' });
+                if (seq !== searchSeq) return;   // sudah ada ketikan baru
+                if (!res.ok || res.redirected) { location.href = url; return; }
+                const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+                if (seq !== searchSeq) return;
+                ['.sg-cards', '.sg-chips'].forEach(sel => {
+                    const cur = document.querySelector(sel), next = doc.querySelector(sel);
+                    if (cur && next) cur.innerHTML = next.innerHTML;
+                });
+                history.replaceState(history.state, '', url);
+            } catch (e) {
+                location.href = url;
+            }
+        };
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(runSearch, 350);
+        });
+        searchForm.addEventListener('submit', e => {
+            e.preventDefault();
+            clearTimeout(searchTimer);
+            runSearch();
+        });
+    }
+
     // ---------- layar penuh (tombol di header); webkit untuk Safari iPad ----------
     const fsBtn = document.getElementById('btnFullscreen');
     const fsRoot = document.documentElement;
