@@ -4,15 +4,20 @@
 
             <div class="ld-modal-header">
                 <div class="ld-modal-header-icon"><i class="bi bi-boxes"></i></div>
-                <div class="flex-fill">
+                <div class="flex-fill ld-modal-heading">
                     <h5 class="ld-modal-title">Pilih Carton untuk Dimuat</h5>
-                    <p class="ld-modal-subtitle">
-                        Container: <span id="modalContainerNo" class="ld-mono">-</span>
-                        &nbsp;·&nbsp;
-                        PO: <span id="modalPoNo" class="ld-mono">-</span>
-                        &nbsp;·&nbsp;
-                        Order No: <span id="modalNoOp" class="ld-mono">-</span>
-                    </p>
+                    <div class="ld-modal-subtitle">
+                        <div class="ld-modal-subrow">
+                            Container: <span id="modalContainerNo" class="ld-mono">-</span>
+                        </div>
+                        {{-- daftar PO / Order No dipotong sesuai lebar modal + "+N PO's" (lihat fitHeaderList) --}}
+                        <div class="ld-modal-subrow">
+                            PO: <span id="modalPoNo" class="ld-mono">-</span>
+                        </div>
+                        <div class="ld-modal-subrow">
+                            Order No: <span id="modalNoOp" class="ld-mono">-</span>
+                        </div>
+                    </div>
                 </div>
                 <button type="button" class="ld-close" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i></button>
             </div>

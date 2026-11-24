@@ -1555,6 +1555,28 @@
             margin: 2px 0 0;
         }
 
+        /* min-width:0 supaya kolom flex boleh lebih sempit dari isinya */
+        .ld-modal-heading {
+            min-width: 0;
+        }
+
+        .ld-modal-subrow {
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .ld-more-badge {
+            display: inline-block;
+            margin-left: 4px;
+            padding: 0 7px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .2);
+            color: #fff;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: help;
+        }
+
         .ld-close {
             width: 32px;
             height: 32px;
@@ -5037,8 +5059,9 @@
                     `?ordpk=${ordpk}&pono=${encodeURIComponent(poNo)}&q=`;
 
                 setText('modalContainerNo', contno);
-                setText('modalPoNo', poNo || '-');
-                setText('modalNoOp', ordno || '-');
+                // dirender ulang sesuai lebar saat modal tampil (shown.bs.modal)
+                setHeaderList('modalPoNo', poNo, "PO's");
+                setHeaderList('modalNoOp', ordno, 'Order');
 
                 // isi dropdown filter PO & Order No dari string koma yang sama seperti di header
                 populateFilterOptions('cartonFilterPo', poNo);
@@ -5079,6 +5102,45 @@
                 });
             }
 
+            const headerLists = {};
+
+            function setHeaderList(id, commaSeparatedValues, label) {
+                headerLists[id] = {
+                    values: [...new Set((commaSeparatedValues || '').split(',').map(v => v.trim()).filter(Boolean))],
+                    label: label,
+                };
+                fitHeaderList(id);
+            }
+
+            // tampilkan sebanyak mungkin nilai dalam 1 baris selebar modal, sisanya jadi "+N PO's"
+            function fitHeaderList(id) {
+                const el = document.getElementById(id);
+                const list = headerLists[id];
+                if (!el || !list) return;
+
+                const values = list.values;
+                const row = el.parentElement;
+                el.title = values.join(', ');
+                el.textContent = values.length ? values.join(', ') : '-';
+                if (!values.length || row.clientWidth === 0 || row.scrollWidth <= row.clientWidth) return;
+
+                const badge = document.createElement('span');
+                badge.className = 'ld-more-badge';
+
+                for (let n = values.length - 1; n >= 0; n--) {
+                    el.textContent = values.slice(0, n).join(', ');
+                    badge.textContent = (n ? '+' : '') + (values.length - n) + ' ' + list.label;
+                    el.appendChild(badge);
+                    if (row.scrollWidth <= row.clientWidth) return;
+                }
+            }
+
+            function refitHeaderLists() {
+                Object.keys(headerLists).forEach(fitHeaderList);
+            }
+
+            window.addEventListener('resize', refitHeaderLists);
+
             function setText(id, value) {
                 const el = document.getElementById(id);
                 if (!el) {
@@ -5090,6 +5152,8 @@
 
             /* ================= INIT DATAGRID (mode CARD) ================= */
             modalEl.addEventListener('shown.bs.modal', function() {
+                refitHeaderLists(); // lebar header baru bisa diukur setelah modal tampil
+
                 if (!gridInitialized) {
                     initGrid();
                     gridInitialized = true;
