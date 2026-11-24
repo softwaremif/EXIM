@@ -159,7 +159,8 @@
 </div>
 
 @if ($hasSel && $ready)
-    {{-- Scanner ID card karyawan untuk petugas seal. Kamera live hanya jalan di HTTPS; di HTTP pakai foto QR --}}
+    {{-- Scanner ID card karyawan (kamera live, tanpa upload foto). Kamera live butuh HTTPS / izin kamera Chrome;
+         tanpa kamera: cari nama / NRK --}}
     <div class="sg-scan" id="scanner" role="dialog" aria-modal="true" aria-labelledby="scanTitle" hidden
         data-url="{{ route('security.gate.employee') }}" data-search-url="{{ route('security.gate.employee.search') }}" data-lib="{{ asset('public/js/vendor/jsQR.min.js') }}">
         <div class="sg-scan__panel">
@@ -171,10 +172,6 @@
                 <video playsinline muted></video>
                 <span class="sg-scan__frame"></span>
             </div>
-            <label class="sg-btn sg-btn--primary sg-btn--lg sg-btn--block" data-scan-photo hidden>
-                @include('menu.exim-export.security.partials.icon', ['name' => 'camera']) Foto QR code di ID card
-                <input class="sg-scan__file" type="file" accept="image/*" capture="environment">
-            </label>
             <p class="sg-scan__status" data-scan-status role="status"></p>
             {{-- tanpa ID card / QR rusak: cari nama atau NRK; NRK + Enter (juga scanner barcode) langsung dipilih --}}
             <form class="sg-scan__manual" data-scan-manual novalidate>
@@ -1335,14 +1332,12 @@
     }
 
     // ---------- scan ID card karyawan (QR berisi NRK) untuk petugas seal ----------
-    // HTTPS: kamera live; HTTP: foto QR. Pembaca QR dimuat di awal, foto diperkecil saat dibuka,
+    // Hanya kamera live (tanpa upload foto); tanpa kamera: cari nama / NRK. Pembaca QR dimuat di awal,
     // dan data karyawan yang sudah pernah dicari disimpan supaya scan ulang langsung terisi.
     const scanDlg = document.getElementById('scanner');
     if (scanDlg) {
         const video = scanDlg.querySelector('video');
         const liveBox = scanDlg.querySelector('[data-scan-live]');
-        const photoBtn = scanDlg.querySelector('[data-scan-photo]');
-        const photoInput = photoBtn.querySelector('input');
         const statusEl = scanDlg.querySelector('[data-scan-status]');
         const titleEl = scanDlg.querySelector('[data-scan-title]');
         const manualForm = scanDlg.querySelector('[data-scan-manual]');
@@ -1394,39 +1389,6 @@
             const code = window.jsQR(img.data, canvas.width, canvas.height, { inversionAttempts: inversion });
             return code && code.data.trim() ? code.data.trim() : null;
         }
-        // foto 12 MP diperkecil saat dibuka (createImageBitmap jauh lebih cepat dari <img>)
-        async function loadPhoto(file) {
-            if (window.createImageBitmap) {
-                try { return await createImageBitmap(file, { resizeWidth: 1600, resizeQuality: 'medium' }); } catch (e) {}
-            }
-            const url = URL.createObjectURL(file);
-            try {
-                return await new Promise((resolve, reject) => {
-                    const im = new Image();
-                    im.onload = () => resolve(im);
-                    im.onerror = () => reject(new Error('Foto tidak bisa dibaca. Ulangi.'));
-                    im.src = url;
-                });
-            } finally {
-                URL.revokeObjectURL(url);
-            }
-        }
-        // urutan dari yang tercepat: utuh kecil -> bagian tengah (QR biasanya di tengah) -> utuh besar
-        async function readPhoto(file) {
-            const img = await loadPhoto(file);
-            try {
-                const native = await nativeScan(img);
-                if (native) return native;
-                await loadLib();
-                const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, c = Math.min(w, h) * 0.6;
-                return jsqrScan(img, 0, 0, w, h, 800, 'dontInvert')
-                    || jsqrScan(img, (w - c) / 2, (h - c) / 2, c, c, 800, 'dontInvert')
-                    || jsqrScan(img, 0, 0, w, h, 1600, 'attemptBoth');
-            } finally {
-                if (img.close) img.close();
-            }
-        }
-
         // ---- data karyawan & slot petugas ----
         async function fetchEmployee(karid) {
             const key = (opts.hl ? 'hl|' : 'hrd|') + karid;
@@ -1542,8 +1504,9 @@
             } catch (e) {
                 stopLive();
                 liveBox.hidden = true;
-                photoBtn.hidden = false;
-                setStatus('Kamera tidak bisa dibuka. Pakai tombol foto.', 'warn');
+                const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+                setStatus(denied ? 'Izin kamera ditolak. Izinkan kamera untuk situs ini di Chrome, atau cari nama / NRK di bawah.'
+                    : 'Kamera tidak bisa dibuka. Cari nama / NRK di bawah.', 'warn');
             }
         }
         // o.hl: boleh karyawan harian lepas (petugas muat)
@@ -1556,8 +1519,7 @@
             manualInput.value = '';
             resetSearch();
             liveBox.hidden = !canLive;
-            photoBtn.hidden = canLive;
-            setStatus(canLive ? 'Membuka kamera…' : 'Foto QR code di ID card dari dekat, pastikan tidak buram.');
+            setStatus(canLive ? 'Membuka kamera…' : 'Kamera scan tidak tersedia di koneksi ini (perlu HTTPS / izin kamera Chrome). Cari nama / NRK di bawah.', canLive ? null : 'warn');
             scanDlg.hidden = false;
             document.body.classList.add('sg-noscroll');
             scanDlg.querySelector('[data-scan-close]').focus();
@@ -1600,19 +1562,6 @@
         scanDlg.querySelector('[data-scan-close]').addEventListener('click', closeScanner);
         scanDlg.addEventListener('click', e => { if (e.target === scanDlg) closeScanner(); });
         document.addEventListener('keydown', e => { if (e.key === 'Escape' && !scanDlg.hidden) closeScanner(); });
-        photoInput.addEventListener('change', async () => {
-            const file = photoInput.files[0];
-            photoInput.value = '';
-            if (!file) return;
-            setStatus('Membaca QR code…');
-            try {
-                const code = await readPhoto(file);
-                if (!code) throw new Error('QR code tidak terbaca. Foto ulang lebih dekat, tidak buram dan tidak silau.');
-                await lookup(code);
-            } catch (err) {
-                setStatus(err.message, 'error');
-            }
-        });
         // ---- cari nama / NRK (petugas tanpa ID card) ----
         let searchTimer = null, searchSeq = 0;
         const searchCache = {};   // sumber|kata kunci => hasil
