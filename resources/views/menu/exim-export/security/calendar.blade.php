@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Kalender ETA · Security Gate</title>
+    <title>Kalender ECA · Security Gate</title>
     <link rel="shortcut icon" href="{!! asset('public/css/images/morich.gif') !!}">
     <link rel="manifest" href="{{ route('security.gate.manifest') }}">
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -34,7 +34,7 @@
             <a class="sg-btn sg-btn--ghost sg-btn--icon" href="{{ route('security.gate.index') }}" aria-label="Kembali ke daftar container" title="Daftar container">@include('menu.exim-export.security.partials.icon', ['name' => 'back'])</a>
         @endunless
         <h1 class="sg-appbar__title">
-            Kalender ETA
+            Kalender ECA
             <span class="sg-appbar__sub">Jadwal kedatangan container</span>
         </h1>
         <span class="sg-appbar__shift">{{ $login }}</span>
@@ -142,7 +142,7 @@
 
     // status sama dengan daftar gate (GateController::decorate)
     const ST = {
-        late: 'Terlambat', today: 'ETA hari ini', upcoming: 'Dijadwalkan', incomplete: 'Belum lengkap',
+        late: 'Terlambat', today: 'ECA hari ini', upcoming: 'Dijadwalkan', incomplete: 'Belum lengkap',
         arrived: 'Di area MIF', rejected: 'Ditolak', departed: 'Sudah keluar',
     };
     const FILTERS = [
@@ -275,7 +275,7 @@
     // satu container di panel detail: baris judul + tabel data
     function entry(c, ctx) {
         const rows = [
-            ['ETA', c.eta ? fmtDay(c.eta) : '<span class="cal-muted">belum diisi</span>'],
+            ['ECA', c.eta ? fmtDay(c.eta) : '<span class="cal-muted">belum diisi</span>'],
             ['Tiba', c.arrived ? `${fmtStamp(c.arrived)} <small>${diffHtml(c)}</small>` : (diffHtml(c) || '<span class="cal-muted">—</span>')],
             ['Keluar', c.departed ? fmtStamp(c.departed) : '<span class="cal-muted">—</span>'],
             ['Shipment', `<span class="sg-mono">${esc(c.idship)}</span>`],
@@ -297,7 +297,7 @@
             <header class="cal-entry__head">
                 <div>
                     <p class="cal-entry__no">${identHtml(c)}</p>
-                    <p class="cal-entry__sub">${kindHtml(c)}${ctx !== 'eta' && c.eta ? ` · ETA ${fmtDay(c.eta)}` : ''}</p>
+                    <p class="cal-entry__sub">${kindHtml(c)}${ctx !== 'eta' && c.eta ? ` · ECA ${fmtDay(c.eta)}` : ''}</p>
                 </div>
                 ${stText(c.status)}
             </header>
@@ -317,7 +317,7 @@
             <button type="button" role="radio" aria-checked="${state.filter === key}" class="cal-opt" data-filter="${key}">
                 ${st ? mark(st) : '<i class="cal-mk cal-mk--none" aria-hidden="true"></i>'}<span>${label}</span><span class="cal-opt__n">${forStatus.filter(c => fn(c.status)).length}</span>
             </button>`).join('') + `
-            <p class="cal-key">${mark('today')}ETA hari ini ${mark('upcoming')}dijadwalkan ${mark('incomplete')}belum lengkap</p>`;
+            <p class="cal-key">${mark('today')}ECA hari ini ${mark('upcoming')}dijadwalkan ${mark('incomplete')}belum lengkap</p>`;
 
         $('calKind').innerHTML = KINDS.map(([key, label, fn]) => `
             <button type="button" role="radio" aria-checked="${state.kind === key}" class="cal-opt" data-kind="${key}">
@@ -327,11 +327,11 @@
         const list = base.filter(kindFn(state.kind));
         const arrived = list.filter(c => c.arrived);
         const sum = [
-            ['Container ETA', list.length],
+            ['Container ECA', list.length],
             ['Sudah tiba', arrived.length],
             ['— tepat waktu / lebih awal', arrived.filter(c => c.diff <= 0).length],
             ['— terlambat', arrived.filter(c => c.diff > 0).length],
-            ['Belum tiba, lewat ETA', list.filter(c => c.status === 'late').length],
+            ['Belum tiba, lewat ECA', list.filter(c => c.status === 'late').length],
             ['Sudah keluar', list.filter(c => c.status === 'departed').length],
         ];
         $('calSumTitle').textContent = `Ringkasan ${MONTHS[Number(state.month.slice(5)) - 1]}`;
@@ -390,7 +390,7 @@
             const marks = evs.slice(0, 8).map(c => mark(c.status)).join('');
             const foot = [arr ? `${arr} tiba` : '', dep ? `${dep} keluar` : ''].filter(Boolean).join(' · ');
             cells += `
-            <button type="button" class="${cls}" data-day="${k}" aria-label="${fmtLong(k)}: ${evs.length} container ETA${arr ? `, ${arr} tiba` : ''}${dep ? `, ${dep} keluar` : ''}">
+            <button type="button" class="${cls}" data-day="${k}" aria-label="${fmtLong(k)}: ${evs.length} container ECA${arr ? `, ${arr} tiba` : ''}${dep ? `, ${dep} keluar` : ''}">
                 <span class="cal-cell__date">${date.getDate() === 1 ? `${date.getDate()} ${MONTHS_S[date.getMonth()]}` : date.getDate()}</span>
                 <span class="cal-cell__lines">${lines}${more}</span>
                 <span class="cal-cell__marks">${marks}</span>
@@ -416,7 +416,7 @@
                 <button type="button" class="cal-wk__head" data-day="${k}">
                     <span class="cal-wk__dow">${DAYS[parseKey(k).getDay()]}</span>
                     <span class="cal-wk__date">${parseKey(k).getDate()}</span>
-                    <span class="cal-wk__meta">${evs.length} ETA${arr ? ` · ${arr} tiba` : ''}${dep ? ` · ${dep} keluar` : ''}</span>
+                    <span class="cal-wk__meta">${evs.length} ECA${arr ? ` · ${arr} tiba` : ''}${dep ? ` · ${dep} keluar` : ''}</span>
                 </button>
                 ${evs.length ? evs.map(c => `
                     <a class="cal-wk__item" href="${esc(c.url)}"${LINK_ATTR}>
@@ -435,11 +435,11 @@
         const d = state.data;
         const days = Object.keys(idx.eta).filter(k => monthOf(k) === state.month).sort();
         if (!days.length) {
-            return `<p class="cal-none">Tidak ada container dengan ETA di ${MONTHS[Number(state.month.slice(5)) - 1]} ${state.month.slice(0, 4)} yang cocok dengan filter.</p>`;
+            return `<p class="cal-none">Tidak ada container dengan ECA di ${MONTHS[Number(state.month.slice(5)) - 1]} ${state.month.slice(0, 4)} yang cocok dengan filter.</p>`;
         }
         return `
         <table class="cal-ag">
-            <thead><tr><th>Tanggal ETA</th><th>Container</th><th>Jenis</th><th>Shipment</th><th>Buyer</th><th>Forwarder</th><th>Tiba</th><th>Keluar</th><th>Status</th></tr></thead>
+            <thead><tr><th>Tanggal ECA</th><th>Container</th><th>Jenis</th><th>Shipment</th><th>Buyer</th><th>Forwarder</th><th>Tiba</th><th>Keluar</th><th>Status</th></tr></thead>
             ${days.map(k => `
             <tbody class="${k === d.today ? 'is-today' : ''} ${k === state.day ? 'is-sel' : ''}">
                 ${idx.eta[k].map((c, i) => `
@@ -467,7 +467,7 @@
         const arr = idx.arr[k] || [];
         const dep = idx.dep[k] || [];
         const late = eta.filter(c => c.status === 'late').length;
-        // entri ETA sudah memuat jam tiba & keluar; bagian tiba / keluar hanya untuk ETA di hari lain
+        // entri ECA sudah memuat jam tiba & keluar; bagian tiba / keluar hanya untuk ECA di hari lain
         const arrOther = arr.filter(c => c.eta !== k);
         const depOther = dep.filter(c => c.eta !== k && !arrOther.includes(c));
         const section = (title, list, ctx) => `
@@ -481,15 +481,15 @@
                 <button type="button" class="cal-tbtn cal-tbtn--icon" data-step="-1" aria-label="Hari sebelumnya">${ICON.back}</button>
                 <div class="cal-d__title">
                     <h2>${fmtLong(k)}</h2>
-                    <p>${relDay(k, d.today)} · ${eta.length} ETA · ${arr.length} tiba · ${dep.length} keluar${late ? ` · <span class="cal-warn">${late} terlambat</span>` : ''}</p>
+                    <p>${relDay(k, d.today)} · ${eta.length} ECA · ${arr.length} tiba · ${dep.length} keluar${late ? ` · <span class="cal-warn">${late} terlambat</span>` : ''}</p>
                 </div>
                 <button type="button" class="cal-tbtn cal-tbtn--icon" data-step="1" aria-label="Hari berikutnya">${ICON.next}</button>
                 <button type="button" class="cal-tbtn cal-tbtn--icon cal-d__close" data-close aria-label="Tutup">${ICON.close}</button>
             </header>
             <div class="cal-d__body">
-                ${eta.length ? section('Jadwal ETA', eta, 'eta') : '<p class="cal-none">Tidak ada container dengan ETA di tanggal ini.</p>'}
-                ${arrOther.length ? section('Tiba hari ini, ETA hari lain', arrOther, 'arr') : ''}
-                ${depOther.length ? section('Keluar hari ini, ETA hari lain', depOther, 'dep') : ''}
+                ${eta.length ? section('Jadwal ECA', eta, 'eta') : '<p class="cal-none">Tidak ada container dengan ECA di tanggal ini.</p>'}
+                ${arrOther.length ? section('Tiba hari ini, ECA hari lain', arrOther, 'arr') : ''}
+                ${depOther.length ? section('Keluar hari ini, ECA hari lain', depOther, 'dep') : ''}
             </div>`;
     }
 
@@ -665,7 +665,7 @@
     // data diperbarui otomatis tiap 2 menit selama halaman terlihat
     setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 120000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
-    // realtime websocket: container / ETA berubah di EXIM -> kalender langsung diperbarui
+    // realtime websocket: container / ECA berubah di EXIM -> kalender langsung diperbarui
     let rtTimer = null;
     window.ShipRT.on(ev => {
         if (ev !== 'cont') return;

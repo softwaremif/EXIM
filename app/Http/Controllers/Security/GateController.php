@@ -150,6 +150,21 @@ class GateController extends Controller
     // riwayat container yang ditolak lalu diganti EXIM (ShipplanController::replaceContainer)
     const HISTORY_TABLE = 'cont_gate_history';
 
+    /**
+     * Truk LCL dipakai beberapa shipment plan: contpk berbeda, plat (nopol) + ECA (export.contdate) sama.
+     * Di daftar security tampil satu kartu per truk; data truk diisi sekali di SP induk lalu disalin ke
+     * semua SP anggota (syncTrip), supaya EXIM / Packing yang membaca per contpk tetap benar.
+     * Ceklis carton tetap per SP (pilih SP di tab Muat).
+     *   gate_trip NULL        belum dikunci: dikelompokkan otomatis menurut plat + ECA (belum tiba & belum draft)
+     *   gate_trip = contpk    SP induk (file foto / video di folder upload/gate/{induk})
+     *   gate_trip = induk     SP anggota; data truk hanya boleh diubah lewat induk
+     * Grup dikunci saat security mulai mengisi (draft / foto pertama). SP yang ditambahkan EXIM setelah itu
+     * ditawarkan untuk digabung (tripJoin); SP yang ternyata tidak ikut truk ini bisa dipisah (tripSplit).
+     */
+    const TRIP_COLUMN = 'gate_trip';
+    // jam yang bisa diisi dari sistem stuffing per SP (Api\ShipplanController::updateShipment): pakai yang paling awal
+    const TRIP_EARLIEST = ['gate_open_at', 'gate_load_at'];
+
     // langkah pemasangan seal (VVTT)
     const SEAL_STEPS = [
         'view'   => ['View', 'Lihat seal & lubang pengunci'],
@@ -258,14 +273,16 @@ class GateController extends Controller
         $filter = $request->query('filter', 'today');
         $q = trim((string) $request->query('q', ''));
 
-        $all = $this->containerQuery($ready)->get()->map(fn($c) => $this->decorate($c, $ready));
+        // truk LCL yang dipakai beberapa SP tampil satu kartu (lihat TRIP_COLUMN)
+        $all = $this->groupTrips($this->containerQuery($ready)->get()->map(fn($c) => $this->decorate($c, $ready)));
 
         if ($q !== '') {
             $needle = Str::upper(preg_replace('/\s+/', '', $q));
             $all = $all->filter(function ($c) use ($needle) {
-                $hay = Str::upper(preg_replace('/\s+/', '', implode('|', [
-                    $c->contno, $c->nopol, $c->idship, $c->POno, $c->buyer, $c->noseal, $c->pic,
-                ])));
+                // cari juga di SP anggota truk (SP ID, PO, buyer, PIC bisa berbeda)
+                $hay = Str::upper(preg_replace('/\s+/', '', $c->members->merge($c->pending)->push($c)
+                    ->map(fn($r) => implode('|', [$r->contno, $r->nopol, $r->idship, $r->POno, $r->buyer, $r->noseal, $r->pic]))
+                    ->implode('|')));
                 return Str::contains($hay, $needle);
             });
         }
@@ -291,6 +308,17 @@ class GateController extends Controller
             $row = $this->containerQuery($ready, false)->where('cont.contpk', (int) $request->query('cont'))->first();
             abort_unless($row, 404, 'Container tidak ditemukan.');
             $selected = $this->decorate($row, $ready);
+            // SP anggota truk LCL (mis. dari scan QR stuffing) dibuka lewat SP induk; ceklis carton tetap SP ini
+            $ckPk = (int) $request->query('sp', $selected->contpk);
+            $leaderPk = $this->tripLeaderPk($selected);
+            if ($leaderPk !== (int) $selected->contpk) {
+                $ckPk = $request->filled('sp') ? $ckPk : (int) $selected->contpk;
+                $selected = $this->decorate($this->containerQuery($ready, false)->where('cont.contpk', $leaderPk)->first(), $ready);
+            }
+            $selected->members = $this->tripMembers($selected);
+            $selected->pending = $this->tripPending($selected);
+            $selected->ck = $selected->members->firstWhere('contpk', $ckPk) ?: $selected;
+            $selected->noseal = $this->tripSeal($selected);
             // container pengganti: tampilkan container sebelumnya yang ditolak
             $selected->replaced = $ready && !$selected->arrived_at
                 ? DB::table(self::HISTORY_TABLE)->where('contpk', $selected->contpk)->orderByDesc('histpk')->first()
@@ -350,10 +378,12 @@ class GateController extends Controller
         $cont = $this->editableCont($contpk);
         $data = $this->validateTruck($request, false);
 
+        $this->lockTrip($cont);
         DB::table('cont')->where('contpk', $cont->contpk)->update($data + [
             'gate_draft_at' => now(),
             'gate_userpk'   => Session::get('userpk'),
         ]);
+        $this->syncTrip($cont->contpk);
 
         return response()->json(['success' => true, 'message' => 'Draft tersimpan.']);
     }
@@ -368,18 +398,24 @@ class GateController extends Controller
             return response()->json(['success' => false, 'message' => 'Data belum lengkap.', 'errors' => ['contno' => ['Isi nomor container sesuai pintu container.']]], 422);
         }
 
+        $this->lockTrip($cont);
         $errors = $this->completenessErrors($cont, $data);
         if ($errors) {
             // data truk & checklist tetap disimpan sebagai draft supaya tidak hilang
             DB::table('cont')->where('contpk', $cont->contpk)->update($data + ['gate_draft_at' => now()]);
+            $this->syncTrip($cont->contpk);
             return response()->json(['success' => false, 'message' => 'Data belum lengkap.', 'errors' => ['media' => $errors]], 422);
         }
 
-        DB::table('cont')->where('contpk', $cont->contpk)->update($data + [
-            'actcontdate'   => now(),
-            'gate_userpk'   => Session::get('userpk'),
-            'gate_draft_at' => null,
-        ]);
+        DB::transaction(function () use ($cont, $data) {
+            DB::table('cont')->where('contpk', $cont->contpk)->update($data + [
+                'actcontdate'   => now(),
+                'gate_userpk'   => Session::get('userpk'),
+                'gate_draft_at' => null,
+            ]);
+            // truk LCL: jam kedatangan & data truk ikut tercatat di semua SP anggota
+            $this->syncTrip($cont->contpk);
+        });
 
         return response()->json([
             'success'  => true,
@@ -393,8 +429,7 @@ class GateController extends Controller
     {
         abort_unless($this->gateColumnsReady(), 503, 'Kolom gate pada table cont belum lengkap. Hubungi IT.');
 
-        $cont = DB::table('cont')->where('contpk', (int) $contpk)->first();
-        abort_unless($cont, 404, 'Container tidak ditemukan.');
+        $cont = $this->truckCont($contpk);
         abort_if(empty($cont->actcontdate), 422, 'Kedatangan container ini belum tercatat.');
         abort_if(!empty($cont->gate_out_at), 422, 'Container ini sudah tercatat keluar.');
         abort_unless($this->signReady(), 503, 'Kolom tanda tangan (gate_signs) belum ada. Hubungi IT.');
@@ -419,6 +454,7 @@ class GateController extends Controller
 
         DB::transaction(function () use ($cont, $data) {
             DB::table('cont')->where('contpk', $cont->contpk)->update($data);
+            $this->syncTrip($cont->contpk);
             // container keluar pabrik: pintu stuffing yang masih dipakai otomatis kosong
             $this->closeVisit($cont->contpk, 'keluar', Carbon::parse($data['gate_out_at']));
         });
@@ -434,13 +470,13 @@ class GateController extends Controller
     public function stuffing(Request $request, $contpk)
     {
         abort_unless($this->gateColumnsReady() && $this->stuffReady(), 503, 'Kolom data muat belum ada. Hubungi IT.');
-        $cont = DB::table('cont')->where('contpk', (int) $contpk)->first();
-        abort_unless($cont, 404, 'Container tidak ditemukan.');
+        $cont = $this->truckCont($contpk);
         abort_if(empty($cont->actcontdate), 422, 'Kedatangan container ini belum tercatat.');
         abort_if(!empty($cont->gate_out_at), 422, 'Container ini sudah tercatat keluar. Ubah lewat menu Edit.');
         abort_if($this->isRejected($cont), 422, 'Container tidak lulus pemeriksaan, tidak ada pemuatan.');
 
         DB::table('cont')->where('contpk', $cont->contpk)->update($this->validateStuffing($request, false, $cont));
+        $this->syncTrip($cont->contpk);
 
         return response()->json(['success' => true, 'message' => 'Data muat tersimpan.']);
     }
@@ -450,8 +486,7 @@ class GateController extends Controller
     public function seal(Request $request, $contpk)
     {
         abort_unless($this->gateColumnsReady() && $this->signReady(), 503, 'Kolom data seal / tanda tangan belum ada. Hubungi IT.');
-        $cont = DB::table('cont')->where('contpk', (int) $contpk)->first();
-        abort_unless($cont, 404, 'Container tidak ditemukan.');
+        $cont = $this->truckCont($contpk);
         abort_if(empty($cont->actcontdate), 422, 'Kedatangan container ini belum tercatat.');
         abort_if(!empty($cont->gate_out_at), 422, 'Container ini sudah tercatat keluar. Ubah lewat menu Edit.');
         abort_if($this->isRejected($cont), 422, 'Container tidak lulus pemeriksaan, tidak ada pemasangan seal.');
@@ -461,6 +496,7 @@ class GateController extends Controller
         $data[self::SIGN_COLUMN] = $signs ? json_encode($signs) : null;
 
         DB::table('cont')->where('contpk', $cont->contpk)->update($data);
+        $this->syncTrip($cont->contpk);
 
         return response()->json(['success' => true, 'message' => 'Data seal tersimpan.']);
     }
@@ -574,12 +610,55 @@ class GateController extends Controller
             $data += ['gate_edit_at' => now(), 'gate_edit_userpk' => Session::get('userpk')];
         }
         DB::table('cont')->where('contpk', $cont->contpk)->update($data);
+        $this->syncTrip($cont->contpk);
 
         return response()->json([
             'success'  => true,
             'message'  => 'Perubahan tersimpan.',
             'redirect' => route('security.gate.index', ['cont' => $cont->contpk, 'filter' => $departed ? 'departed' : 'arrived', 'edited' => 1]),
         ]);
+    }
+
+    // SP baru dari EXIM (plat + ECA sama) digabung ke truk ini; data truk (jam tiba, foto, dst.) ikut tersalin
+    public function tripJoin(Request $request, $contpk)
+    {
+        abort_unless($this->tripReady(), 503, 'Kolom gate_trip pada table cont belum ada. Hubungi IT.');
+        $leader = $this->editableCont($contpk, true);
+        abort_if(!empty($leader->gate_out_at), 422, 'Truk ini sudah keluar. SP baru dicatat sebagai truk terpisah.');
+        $v = $request->validate(['sp' => 'required|integer']);
+
+        $ready = $this->gateColumnsReady();
+        $row = $this->decorate($this->containerQuery($ready, false)->where('cont.contpk', $leader->contpk)->first(), $ready);
+        $member = $this->tripPending($row)->firstWhere('contpk', (int) $v['sp']);
+        abort_unless($member, 422, 'SP ini tidak bisa digabung: plat / ECA berbeda, atau sudah diisi security.');
+
+        DB::transaction(function () use ($leader, $member) {
+            DB::table('cont')->whereIn('contpk', [$leader->contpk, $member->contpk])->update([self::TRIP_COLUMN => $leader->contpk]);
+            $this->syncTrip($leader->contpk);
+        });
+
+        return response()->json(['success' => true, 'message' => "{$member->idship} digabung ke truk ini."]);
+    }
+
+    // SP yang ternyata tidak ikut truk ini dipisah: data truk yang tersalin dikosongkan, SP jadi truk sendiri
+    public function tripSplit(Request $request, $contpk)
+    {
+        abort_unless($this->tripReady(), 503, 'Kolom gate_trip pada table cont belum ada. Hubungi IT.');
+        $leader = $this->editableCont($contpk, true);
+        abort_if(!empty($leader->gate_out_at), 422, 'Truk ini sudah keluar, SP tidak bisa dipisah.');
+        $v = $request->validate(['sp' => 'required|integer']);
+        abort_if((int) $v['sp'] === (int) $leader->contpk, 422, 'SP induk tidak bisa dipisah. Pisahkan SP lainnya.');
+
+        $ready = $this->gateColumnsReady();
+        $row = $this->decorate($this->containerQuery($ready, false)->where('cont.contpk', $leader->contpk)->first(), $ready);
+        $member = $this->tripMembers($row)->firstWhere('contpk', (int) $v['sp']);
+        abort_unless($member, 422, 'SP ini bukan bagian dari truk ini.');
+
+        // gate_trip negatif = sudah dipisah: tidak dikelompokkan otomatis lagi
+        $reset = array_fill_keys(array_values(array_intersect($this->truckColumns(), $this->contColumns())), null);
+        DB::table('cont')->where('contpk', $member->contpk)->update($reset + ['gate_transporter' => null, self::TRIP_COLUMN => -(int) $member->contpk]);
+
+        return response()->json(['success' => true, 'message' => "{$member->idship} dipisah dari truk ini."]);
     }
 
     // data karyawan dari hasil scan ID card (QR berisi karid / NRK)
@@ -793,6 +872,8 @@ class GateController extends Controller
         $prefix = $kind === 'cont' ? 'cont_' . $v['slot'] : $kind;
         $filename = $prefix . '_' . date('YmdHis') . '_' . Str::lower(Str::random(6)) . '.' . $ext;
         rename($part, "{$folder}/{$filename}");
+        // foto pertama truk LCL mengunci grup SP-nya ke SP ini (folder media = SP induk)
+        $this->lockTrip($cont);
 
         // dibaca ulang dengan kunci: beberapa foto bisa selesai diunggah bersamaan
         DB::transaction(function () use ($cont, $kind, $isOut, $isVideo, $filename, $v) {
@@ -833,6 +914,7 @@ class GateController extends Controller
                 $update['gate_foto_cont'] = $this->encodeContPhotos($photos);
             }
             DB::table('cont')->where('contpk', $cont->contpk)->update($update);
+            $this->syncTrip($cont->contpk);
         });
 
         return response()->json(['success' => true, 'done' => true] + $this->mediaPayload($cont->contpk));
@@ -874,6 +956,7 @@ class GateController extends Controller
             $update['gate_foto_cont'] = $this->encodeContPhotos($photos);
         }
         DB::table('cont')->where('contpk', $cont->contpk)->update($update);
+        $this->syncTrip($cont->contpk);
 
         return response()->json(['success' => true] + $this->mediaPayload($cont->contpk));
     }
@@ -998,6 +1081,7 @@ class GateController extends Controller
             $update['gate_close_at'] = null;
         }
         DB::table('cont')->where('contpk', $cont->contpk)->update($update);
+        $this->syncTrip($cont->contpk);
 
         return response()->json(['success' => true] + $this->mediaPayload($cont->contpk));
     }
@@ -1033,7 +1117,7 @@ class GateController extends Controller
     }
 
     // container dari shipment plan yang belum dibatalkan; untuk daftar ($window) dibatasi
-    // yang belum tiba (ETA 30 hari ke belakang s/d 7 hari ke depan) atau tiba 7 hari terakhir
+    // yang belum tiba (ECA 30 hari ke belakang s/d 7 hari ke depan) atau tiba 7 hari terakhir
     protected function containerQuery(bool $ready, bool $window = true)
     {
         $today = Carbon::today();
@@ -1046,6 +1130,9 @@ class GateController extends Controller
         // supaya status keluar / ditolak di daftar tetap benar
         foreach (array_intersect(array_merge(self::GATE_COLUMNS, self::EDIT_COLUMNS, [self::SIGN_COLUMN, self::OUT_MEDIA_COLUMN, self::IN_GUARDS_COLUMN], self::STUFF_COLUMNS), $this->contColumns()) as $col) {
             $cols[] = 'cont.' . $col;
+        }
+        if ($this->tripReady()) {
+            $cols[] = 'cont.' . self::TRIP_COLUMN;
         }
 
         // ekspedisi dipilih EXIM di modal edit shipment plan (cont.angpk -> ang, perusahaan angkutan), kalau kolomnya sudah ada
@@ -1100,6 +1187,12 @@ class GateController extends Controller
         // NRK petugas security gate in; nama dari HRD diisi lewat inGuards() hanya untuk container yang dibuka
         $c->in_guard_nrks = array_values(array_filter(array_map('trim', explode(',', (string) ($c->{self::IN_GUARDS_COLUMN} ?? '')))));
         $c->in_guards = [];
+        // truk LCL bersama: SP induk (folder media) & SP lain di truk yang sama, diisi groupTrips / index
+        $trip = (int) ($c->{self::TRIP_COLUMN} ?? 0);
+        $c->trip = $trip > 0 ? $trip : null;
+        $c->media_pk = $c->trip ?: $c->contpk;
+        $c->members = collect();
+        $c->pending = collect();
 
         if ($c->departed_at) {
             $c->status = 'departed';
@@ -1247,7 +1340,8 @@ class GateController extends Controller
         }
         $validator = Validator::make($request->all(), $rules, $messages);
         $validator->after(function ($validator) use ($cont, $final) {
-            if ($final && trim((string) $cont->noseal) === '') {
+            // truk LCL: seal per truk, cukup diisi EXIM di salah satu SP
+            if ($final && trim((string) $this->tripSeal($cont)) === '') {
                 $validator->errors()->add('noseal', 'No. seal belum diisi EXIM di shipment plan. Hubungi EXIM.');
             }
         });
@@ -1708,6 +1802,9 @@ class GateController extends Controller
             ->where(fn($q) => $q->whereNull('cont.gate_result')->orWhere('cont.gate_result', '<>', 0))
             ->where(fn($q) => $q->whereNull('export.stscancel')->orWhere('export.stscancel', '<>', 1))
             ->whereNotIn('cont.contpk', $active->pluck('contpk'))
+            // truk LCL bersama cukup tampil sekali (SP induk)
+            ->when($this->tripReady(), fn($q) => $q->where(fn($w) => $w->whereNull('cont.' . self::TRIP_COLUMN)
+                ->orWhere('cont.' . self::TRIP_COLUMN, '<', 0)->orWhereColumn('cont.' . self::TRIP_COLUMN, 'cont.contpk')))
             ->orderBy('cont.actcontdate')
             ->get(['cont.contpk', 'cont.contno', 'cont.type', 'cont.nopol', 'cont.exportpk', 'cont.actcontdate', 'cont.gate_userpk', 'export.buyer']);
         $gateLogins = DB::connection('mysql_akses')->table('user')
@@ -1946,8 +2043,258 @@ class GateController extends Controller
         $cont = DB::table('cont')->where('contpk', (int) $contpk)->first();
         abort_unless($cont, 404, 'Container tidak ditemukan.');
         abort_if(!$afterArrival && !empty($cont->actcontdate), 422, 'Kedatangan container ini sudah tercatat.');
+        $this->guardTrip($cont);
 
         return $cont;
+    }
+
+    // container untuk simpan muat / seal / keluar: data truk LCL (jam muat dari SP lain) disatukan dulu
+    protected function truckCont($contpk)
+    {
+        $cont = DB::table('cont')->where('contpk', (int) $contpk)->first();
+        abort_unless($cont, 404, 'Container tidak ditemukan.');
+        $this->guardTrip($cont);
+        $this->syncTrip($cont->contpk);
+
+        return DB::table('cont')->where('contpk', $cont->contpk)->first();
+    }
+
+    // ====================================================================
+    // Truk LCL bersama (lihat TRIP_COLUMN)
+    // ====================================================================
+
+    protected function tripReady(): bool
+    {
+        return in_array(self::TRIP_COLUMN, $this->contColumns(), true);
+    }
+
+    // kolom data truk yang disalin dari SP induk ke SP anggota (gate_transporter per SP, lihat syncTrip)
+    protected function truckColumns(): array
+    {
+        return array_values(array_diff(array_merge(['actcontdate'], self::GATE_COLUMNS, self::EDIT_COLUMNS,
+            [self::SIGN_COLUMN, self::OUT_MEDIA_COLUMN, self::IN_GUARDS_COLUMN], self::STUFF_COLUMNS), ['gate_transporter']));
+    }
+
+    // kunci truk: plat tanpa spasi + tanggal ECA; null kalau bukan LCL atau plat / ECA belum diisi EXIM
+    protected function tripKey($c): ?string
+    {
+        $plate = Str::upper(preg_replace('/\s+/', '', (string) ($c->nopol ?? '')));
+        if (!$this->tripReady() || !$this->isLcl($c) || $plate === '' || empty($c->contdate)) {
+            return null;
+        }
+        return $plate . '|' . Carbon::parse($c->contdate)->toDateString();
+    }
+
+    // boleh dikelompokkan otomatis: belum dikunci / dipisah, belum tiba, belum ada draft
+    protected function tripOpen($c): bool
+    {
+        return empty($c->{self::TRIP_COLUMN}) && empty($c->actcontdate) && empty($c->gate_draft_at);
+    }
+
+    // truk yang sudah diisi security (SP induk, atau SP tunggal yang sudah draft / tiba) dan belum keluar
+    protected function tripAnchor($c): bool
+    {
+        $trip = (int) ($c->{self::TRIP_COLUMN} ?? 0);
+        return empty($c->gate_out_at) && ($trip === (int) $c->contpk || (!$trip && !$this->tripOpen($c)));
+    }
+
+    // containerQuery tanpa batas tanggal, dibatasi ke truk LCL dengan kunci yang sama
+    protected function sameTruckQuery(string $key)
+    {
+        [$plate, $date] = explode('|', $key);
+        return $this->containerQuery($this->gateColumnsReady(), false)
+            ->whereRaw('LOWER(TRIM(cont.type)) = ?', ['lcl'])
+            ->whereRaw("UPPER(REPLACE(cont.nopol, ' ', '')) = ?", [$plate])
+            ->whereDate('export.contdate', $date)
+            ->orderBy('cont.contpk');
+    }
+
+    protected function whereTripOpen($query)
+    {
+        return $query->whereNull('cont.' . self::TRIP_COLUMN)->whereNull('cont.actcontdate')->whereNull('cont.gate_draft_at');
+    }
+
+    protected function whereTripAnchor($query)
+    {
+        return $query->whereNull('cont.gate_out_at')->where(fn($q) => $q->whereColumn('cont.' . self::TRIP_COLUMN, 'cont.contpk')
+            ->orWhere(fn($w) => $w->whereNull('cont.' . self::TRIP_COLUMN)
+                ->where(fn($x) => $x->whereNotNull('cont.actcontdate')->orWhereNotNull('cont.gate_draft_at'))));
+    }
+
+    /**
+     * Daftar container: SP anggota truk disembunyikan, SP induk membawa ->members (semua SP truk, urut contpk)
+     * dan ->pending (SP baru dengan plat + ECA truk yang sudah diisi, menunggu digabung).
+     */
+    protected function groupTrips($all)
+    {
+        if (!$this->tripReady()) {
+            return $all;
+        }
+        $byPk = $all->keyBy('contpk');
+        $hidden = [];
+
+        foreach ($all->filter(fn($c) => $c->trip)->groupBy('trip') as $trip => $rows) {
+            $rows = $rows->sortBy('contpk')->values();
+            $leader = $byPk->get((int) $trip) ?: $rows->first();
+            $leader->members = $rows;
+            foreach ($rows as $r) {
+                if ($r !== $leader) {
+                    $hidden[$r->contpk] = true;
+                }
+            }
+        }
+
+        $open = $all->filter(fn($c) => $this->tripKey($c) && $this->tripOpen($c));
+        $anchors = [];
+        foreach ($all->sortBy('contpk') as $c) {
+            $key = $this->tripKey($c);
+            if ($key && !isset($hidden[$c->contpk]) && !isset($anchors[$key]) && $this->tripAnchor($c)) {
+                $anchors[$key] = $c;
+            }
+        }
+        foreach ($open as $c) {
+            if ($anchor = $anchors[$this->tripKey($c)] ?? null) {
+                $anchor->pending = $anchor->pending->push($c);
+                $hidden[$c->contpk] = true;
+            }
+        }
+
+        foreach ($open->reject(fn($c) => isset($hidden[$c->contpk]))->groupBy(fn($c) => $this->tripKey($c)) as $rows) {
+            if ($rows->count() < 2) {
+                continue;
+            }
+            $rows = $rows->sortBy('contpk')->values();
+            $rows[0]->members = $rows;
+            foreach ($rows->slice(1) as $r) {
+                $hidden[$r->contpk] = true;
+            }
+        }
+
+        return $all->reject(fn($c) => isset($hidden[$c->contpk]))->values();
+    }
+
+    // SP induk yang dipakai untuk membuka container ini (contpk sendiri kalau bukan truk bersama)
+    protected function tripLeaderPk($c): int
+    {
+        if ($c->trip) {
+            return $c->trip;
+        }
+        $key = $this->tripKey($c);
+        if (!$key || !$this->tripOpen($c)) {
+            return (int) $c->contpk;
+        }
+        // SP baru untuk truk yang sudah diisi -> buka truk itu; selain itu SP terkecil di grup otomatis
+        $anchor = $this->whereTripAnchor($this->sameTruckQuery($key))->value('cont.contpk');
+        return (int) ($anchor ?: $this->whereTripOpen($this->sameTruckQuery($key))->value('cont.contpk') ?: $c->contpk);
+    }
+
+    // semua SP di truk SP induk $c (termasuk $c), urut contpk
+    protected function tripMembers($c)
+    {
+        $key = $this->tripKey($c);
+        if ($c->trip) {
+            $rows = $this->containerQuery($this->gateColumnsReady(), false)->where('cont.' . self::TRIP_COLUMN, $c->trip)->orderBy('cont.contpk')->get();
+        } elseif ($key && $this->tripOpen($c) && !$this->whereTripAnchor($this->sameTruckQuery($key))->exists()) {
+            $rows = $this->whereTripOpen($this->sameTruckQuery($key))->get();
+        } else {
+            return collect([$c]);
+        }
+        $ready = $this->gateColumnsReady();
+        return $rows->map(fn($r) => (int) $r->contpk === (int) $c->contpk ? $c : $this->decorate($r, $ready))->values();
+    }
+
+    // SP baru dengan plat + ECA sama yang belum ikut truk ini (truk sudah diisi security & belum keluar)
+    protected function tripPending($c)
+    {
+        $key = $this->tripKey($c);
+        if (!$key || !$this->tripAnchor($c)) {
+            return collect();
+        }
+        $ready = $this->gateColumnsReady();
+        return $this->whereTripOpen($this->sameTruckQuery($key))->where('cont.contpk', '<>', $c->contpk)->get()
+            ->map(fn($r) => $this->decorate($r, $ready))->values();
+    }
+
+    // security mulai mengisi truk (draft / foto pertama): SP lain di grup otomatis dikunci ke SP ini sebagai induk
+    protected function lockTrip($cont): void
+    {
+        if (!$this->tripReady() || !empty($cont->{self::TRIP_COLUMN}) || !empty($cont->actcontdate)) {
+            return;
+        }
+        $row = $this->containerQuery($this->gateColumnsReady(), false)->where('cont.contpk', $cont->contpk)->first();
+        $key = $row ? $this->tripKey($row) : null;
+        if (!$key) {
+            return;
+        }
+        $pks = $this->sameTruckQuery($key)->whereNull('cont.' . self::TRIP_COLUMN)->whereNull('cont.actcontdate')
+            ->where(fn($q) => $q->whereNull('cont.gate_draft_at')->orWhere('cont.contpk', $cont->contpk))
+            ->pluck('cont.contpk');
+        if ($pks->count() > 1) {
+            DB::table('cont')->whereIn('contpk', $pks)->whereNull(self::TRIP_COLUMN)->update([self::TRIP_COLUMN => $cont->contpk]);
+        }
+    }
+
+    // data truk hanya diubah lewat SP induk; SP baru untuk truk yang sudah diisi digabung lewat truk itu
+    protected function guardTrip($cont): void
+    {
+        if (!$this->tripReady()) {
+            return;
+        }
+        $trip = (int) ($cont->{self::TRIP_COLUMN} ?? 0);
+        abort_if($trip > 0 && $trip !== (int) $cont->contpk, 422, 'SP ini satu truk LCL dengan SP lain. Data truk diisi lewat SP induk, muat ulang halaman.');
+        if (!$trip && $this->tripOpen($cont) && $this->isLcl($cont)) {
+            $row = $this->containerQuery($this->gateColumnsReady(), false)->where('cont.contpk', $cont->contpk)->first();
+            $key = $row ? $this->tripKey($row) : null;
+            abort_if($key && $this->whereTripAnchor($this->sameTruckQuery($key))->where('cont.contpk', '<>', $cont->contpk)->exists(), 422,
+                'Truk dengan plat & ECA yang sama sudah diisi lewat SP lain. Gabungkan SP ini lewat truk tersebut, muat ulang halaman.');
+        }
+    }
+
+    /**
+     * Salin data truk dari SP induk ke semua SP anggota. Jam buka / mulai muat yang masih kosong di induk
+     * diambil dari SP anggota (diisi sistem stuffing per SP), paling awal. Angkutan = forwarder masing-masing SP.
+     */
+    protected function syncTrip($leaderPk): void
+    {
+        if (!$this->tripReady() || !$leaderPk) {
+            return;
+        }
+        $rows = DB::table('cont')->leftJoin('fwd', 'fwd.fwdpk', '=', 'cont.fwdpk')
+            ->where('cont.' . self::TRIP_COLUMN, (int) $leaderPk)->get(['cont.*', 'fwd.fwdnm']);
+        $leader = $rows->firstWhere('contpk', (int) $leaderPk);
+        if ($rows->count() < 2 || !$leader) {
+            return;
+        }
+        $cols = array_values(array_intersect($this->truckColumns(), $this->contColumns()));
+        $data = [];
+        foreach ($cols as $col) {
+            $data[$col] = $leader->{$col};
+        }
+        foreach (array_intersect(self::TRIP_EARLIEST, $cols) as $col) {
+            $data[$col] = $leader->{$col} ?: $rows->pluck($col)->filter()->min();
+        }
+        DB::table('cont')->where(self::TRIP_COLUMN, (int) $leaderPk)->update($data);
+
+        if (!empty($leader->gate_transporter)) {
+            foreach ($rows as $r) {
+                if ((int) $r->contpk !== (int) $leaderPk && empty($r->gate_transporter) && trim((string) $r->fwdnm) !== '') {
+                    DB::table('cont')->where('contpk', $r->contpk)->update(['gate_transporter' => trim($r->fwdnm)]);
+                }
+            }
+        }
+    }
+
+    // no. seal truk: seal per truk, ambil yang diisi EXIM di salah satu SP (SP induk dulu)
+    protected function tripSeal($c): ?string
+    {
+        $own = trim((string) ($c->noseal ?? ''));
+        $trip = (int) ($c->{self::TRIP_COLUMN} ?? 0);
+        if ($own !== '' || !$this->tripReady() || $trip <= 0) {
+            return $own !== '' ? $own : null;
+        }
+        $seal = DB::table('cont')->where(self::TRIP_COLUMN, $trip)->whereNotNull('noseal')->where('noseal', '<>', '')
+            ->orderByRaw('contpk = ? DESC', [$trip])->orderBy('contpk')->value('noseal');
+        return $seal ? trim($seal) : null;
     }
 
     // gate_foto_cont -> ["depan" => file|null, ..., "lama" => [file, ...]] (lihat CONT_PHOTO_SLOTS)

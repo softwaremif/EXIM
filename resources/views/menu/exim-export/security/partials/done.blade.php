@@ -6,11 +6,11 @@
     if ($s->eta) {
         $days = $s->eta->diffInDays($s->arrived_at->copy()->startOfDay(), false);
         if ($days > 0) {
-            [$deltaClass, $deltaText] = ['is-late', $days . ' hari setelah ETA ' . $s->eta->isoFormat('D MMM')];
+            [$deltaClass, $deltaText] = ['is-late', $days . ' hari setelah ECA ' . $s->eta->isoFormat('D MMM')];
         } elseif ($days < 0) {
-            [$deltaClass, $deltaText] = ['is-ontime', abs($days) . ' hari sebelum ETA ' . $s->eta->isoFormat('D MMM')];
+            [$deltaClass, $deltaText] = ['is-ontime', abs($days) . ' hari sebelum ECA ' . $s->eta->isoFormat('D MMM')];
         } else {
-            [$deltaClass, $deltaText] = ['is-ontime', 'Sesuai ETA hari ini'];
+            [$deltaClass, $deltaText] = ['is-ontime', 'Sesuai ECA hari ini'];
         }
     }
     $rejected = $ready && $s->gate_result !== null && (int) $s->gate_result === 0;
@@ -52,7 +52,8 @@
         </li>
     @endforeach
 </ol>
-<div class="sg-main" id="doneMain" data-start-tab="{{ $s->departed_at ? 'in' : 'load' }}">
+{{-- ?sp= (pilih SP ceklis carton truk LCL) membuka tab Muat --}}
+<div class="sg-main" id="doneMain" data-start-tab="{{ $s->departed_at && !request()->filled('sp') ? 'in' : 'load' }}">
     @unless ($ready)
         <div class="sg-alert sg-alert--warn" role="status">
             @include('menu.exim-export.security.partials.icon', ['name' => 'warn'])
@@ -184,6 +185,8 @@
             </div>
         </div>
     </section>
+
+    @include('menu.exim-export.security.partials.trip')
 
     @if ($s->answers)
         <section class="sg-section">

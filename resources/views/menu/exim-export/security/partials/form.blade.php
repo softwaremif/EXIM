@@ -71,7 +71,7 @@
                 <dt>Tipe</dt>
                 <dd><span class="sg-kind {{ $s->is_lcl ? 'sg-kind--lcl' : '' }}">{{ $s->is_lcl ? 'LCL' : 'Container' }}</span> {{ $s->is_lcl ? 'tanpa container, acuan plat truk' : $s->type_label }}</dd>
                 <dt>Shipment</dt><dd class="sg-mono">{{ $s->idship }}</dd>
-                <dt>ETA</dt><dd>{{ $s->eta ? $s->eta->isoFormat('dddd, D MMM YYYY') : '-' }}</dd>
+                <dt title="Estimasi Container Arrival">ECA <span class="sg-hint">(Estimasi Container Arrival)</span></dt><dd>{{ $s->eta ? $s->eta->isoFormat('dddd, D MMM YYYY') : '-' }}</dd>
                 <dt>Buyer</dt><dd>{{ $s->buyer ?: '-' }}</dd>
                 <dt>Forwarder</dt><dd>{{ $s->fwdnm ?: '-' }}</dd>
                 <dt>Ekspedisi</dt><dd>{{ ($s->ekspedisinm ?? null) ?: '-' }}</dd>
@@ -86,6 +86,7 @@
                 </div>
             @endunless
         </section>
+        @include('menu.exim-export.security.partials.trip')
     </div>
 
     <div class="sg-panel" id="panel-truck" data-panel="truck" role="tabpanel">

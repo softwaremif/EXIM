@@ -44,7 +44,7 @@
         <span class="sg-appbar__shift">{{ $login }}</span>
         {{-- muncul kalau browser siap menginstal aplikasi (HTTPS + manifest + service worker), lihat GateAppController --}}
         <button type="button" class="sg-btn sg-btn--ghost sg-btn--icon" id="btnInstall" aria-label="Instal aplikasi Security Gate" title="Instal aplikasi" hidden>@include('menu.exim-export.security.partials.icon', ['name' => 'download'])</button>
-        <a class="sg-btn sg-btn--ghost sg-btn--icon" href="{{ route('security.gate.calendar') }}" aria-label="Kalender ETA container" title="Kalender ETA">@include('menu.exim-export.security.partials.icon', ['name' => 'calendar'])</a>
+        <a class="sg-btn sg-btn--ghost sg-btn--icon" href="{{ route('security.gate.calendar') }}" aria-label="Kalender ECA container" title="Kalender ECA">@include('menu.exim-export.security.partials.icon', ['name' => 'calendar'])</a>
         @if ($dockBadge)
             {{-- pintu: angka = pintu terisi / jumlah pintu (pos MIF security) --}}
             <a class="sg-btn sg-btn--ghost sg-btn--icon sg-appbar__dock" href="{{ route('security.gate.dock') }}" aria-label="Pintu, {{ $dockBadge }} terisi" title="Pintu">
@@ -2298,7 +2298,15 @@
 // reload halaman; event "pack" = carton berubah (scan stuffing) -> ceklis carton container terpilih.
 (function () {
     const RT = window.ShipRT;
-    const SEL = @json($hasSel ? ['contpk' => (int) $selected->contpk, 'exportpk' => (int) ($selected->exportpk ?? 0)] : null);
+    // truk LCL bersama: perubahan SP mana pun di truk ini dianggap container terpilih; carton mengikuti SP yang diceklis
+    @php
+        $rtSel = $hasSel ? [
+            'contpk'   => (int) $selected->contpk,
+            'contpks'  => $selected->members->pluck('contpk')->map(fn($v) => (int) $v)->values(),
+            'exportpk' => (int) ($selected->ck->exportpk ?? $selected->exportpk ?? 0),
+        ] : null;
+    @endphp
+    const SEL = @json($rtSel);
     const timers = {};
     const later = (key, fn) => { clearTimeout(timers[key]); timers[key] = setTimeout(fn, 200 + Math.random() * 500); };
     let listBusy = false;
@@ -2347,7 +2355,7 @@
         }
         if (!d.self) later('list', refreshList);
         if (mine && window.sgCartonsReload) later('ck', window.sgCartonsReload); // mulai / selesai stuffing ikut mengunci ceklis
-        if (SEL && d.contpk === SEL.contpk && !d.self) notifyChanged();
+        if (SEL && (d.contpk === SEL.contpk || SEL.contpks.includes(d.contpk)) && !d.self) notifyChanged();
     });
     // baru tersambung lagi setelah putus: kejar perubahan selama offline
     let wasOn = false;

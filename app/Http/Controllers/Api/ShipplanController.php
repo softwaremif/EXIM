@@ -180,6 +180,15 @@ class ShipplanController extends Controller
 
         DB::table('cont')->where('contpk', $validated['contpk'])->update($updateData);
 
+        // truk LCL dipakai beberapa SP: jam buka / mulai muat berlaku untuk satu truk, isi SP lain yang masih kosong
+        $trip = (int) ($contRow->{\App\Http\Controllers\Security\GateController::TRIP_COLUMN} ?? 0);
+        if ($trip > 0) {
+            foreach (array_intersect_key($updateData, array_flip(\App\Http\Controllers\Security\GateController::TRIP_EARLIEST)) as $col => $at) {
+                DB::table('cont')->where(\App\Http\Controllers\Security\GateController::TRIP_COLUMN, $trip)
+                    ->whereNull($col)->whereNull('gate_out_at')->update([$col => $at]);
+            }
+        }
+
         DB::table('export')->where('exportpk', $validated['exportpk'])
             ->update(['dateupdt' => now()->toDateTimeString()]);
 

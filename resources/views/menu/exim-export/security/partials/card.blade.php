@@ -1,6 +1,9 @@
 @php
     $isSelected = $selected && $selected->contpk == $c->contpk;
-    $etaText = 'ETA belum diisi';
+    // truk LCL dipakai beberapa SP: satu kartu, info SP digabung (lihat GateController::groupTrips)
+    $sps = $c->members->count() > 1 ? $c->members : collect([$c]);
+    $join = fn($field) => $sps->pluck($field)->map(fn($v) => trim((string) $v))->filter()->unique()->implode(', ');
+    $etaText = 'ECA belum diisi';
     $action = 'Ketuk untuk gate in ›';
     if ($c->status === 'departed') {
         $etaText = 'Keluar ' . $c->departed_at->format('H:i') . ' · ' . $c->departed_at->isoFormat('D MMM');
@@ -10,13 +13,13 @@
         $action = 'Catat keluar ›';
     } elseif ($c->eta) {
         if ($c->eta_days < 0) {
-            $etaText = 'Lewat ' . abs($c->eta_days) . ' hari · ETA ' . $c->eta->isoFormat('D MMM');
+            $etaText = 'Lewat ' . abs($c->eta_days) . ' hari · ECA ' . $c->eta->isoFormat('D MMM');
         } elseif ($c->eta_days === 0) {
-            $etaText = 'ETA hari ini';
+            $etaText = 'ECA hari ini';
         } elseif ($c->eta_days === 1) {
-            $etaText = 'ETA besok · ' . $c->eta->isoFormat('D MMM');
+            $etaText = 'ECA besok · ' . $c->eta->isoFormat('D MMM');
         } else {
-            $etaText = 'ETA ' . $c->eta->isoFormat('ddd, D MMM');
+            $etaText = 'ECA ' . $c->eta->isoFormat('ddd, D MMM');
         }
     }
 @endphp
@@ -34,7 +37,7 @@
             </a>
             <span class="sg-card__type">
                 <span class="sg-kind {{ $c->is_lcl ? 'sg-kind--lcl' : '' }}">{{ $c->is_lcl ? 'LCL' : 'Container' }}</span>
-                {{ $c->is_lcl ? 'Plat truk' : $c->type_label }} · Export
+                {{ $c->is_lcl ? 'Plat truk' : $c->type_label }} · Export{{ $sps->count() > 1 ? ' · ' . $sps->count() . ' SP' : '' }}
             </span>
         </div>
         <span class="sg-card__badges">
@@ -45,11 +48,14 @@
         </span>
     </div>
     <dl class="sg-card__meta">
-        <dt>Shipment</dt><dd class="sg-mono">{{ $c->idship }}</dd>
-        <dt>Buyer</dt><dd>{{ $c->buyer ?: '-' }}</dd>
-        <dt>Forwarder</dt><dd>{{ $c->fwdnm ?: '-' }}</dd>
-        <dt>Ekspedisi</dt><dd>{{ ($c->ekspedisinm ?? null) ?: '-' }}</dd>
-        <dt>PIC EXIM</dt><dd>{{ $c->pic ?: '-' }}</dd>
+        <dt>Shipment</dt><dd class="sg-mono">{{ $join('idship') }}</dd>
+        <dt>Buyer</dt><dd>{{ $join('buyer') ?: '-' }}</dd>
+        <dt>Forwarder</dt><dd>{{ $join('fwdnm') ?: '-' }}</dd>
+        <dt>Ekspedisi</dt><dd>{{ $join('ekspedisinm') ?: '-' }}</dd>
+        <dt>PIC EXIM</dt><dd>{{ $join('pic') ?: '-' }}</dd>
+        @if ($c->pending->isNotEmpty() && !$c->departed_at)
+            <dt>SP baru</dt><dd class="sg-card__pending">{{ $c->pending->pluck('idship')->implode(', ') }} · belum digabung</dd>
+        @endif
         @if ($c->is_lcl)
             @if ($c->contno_fmt)
                 <dt>No. container</dt><dd class="sg-mono">{{ $c->contno_fmt }}</dd>

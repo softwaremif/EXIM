@@ -35,6 +35,7 @@ class GateDocController extends GateController
         abort_if($doc !== 'checklist' && $this->isRejected($c), 404, 'Container tidak lulus pemeriksaan, tidak ada pemuatan.');
 
         $c->is_rejected = $this->isRejected($c);
+        $c->noseal = $this->tripSeal($c);
         $c->seal_people = $ready ? $this->sealPeople($c) : [];
         $c->in_guards = $this->inGuards($c);
         if ($doc !== 'checklist') {
@@ -48,7 +49,8 @@ class GateDocController extends GateController
             'sealSteps' => self::SEAL_STEPS,
             'sealRoles' => self::SEAL_PEOPLE,
             'signers'   => self::SIGNERS,
-            'media'     => fn($f) => $f ? asset('public/upload/gate/' . (int) $c->contpk . '/' . $f) : null,
+            // truk LCL bersama: file foto / tanda tangan ada di folder SP induk
+            'media'     => fn($f) => $f ? asset('public/upload/gate/' . (int) $c->media_pk . '/' . $f) : null,
         ]);
     }
 }

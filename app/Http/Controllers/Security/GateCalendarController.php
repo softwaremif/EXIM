@@ -7,8 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 
 /**
- * Kalender ETA container (Security Gate): jadwal kedatangan container per hari
- * berdasarkan ETA shipment plan (export.contdate), lengkap dengan jam tiba aktual
+ * Kalender ECA container (Security Gate): jadwal kedatangan container per hari
+ * berdasarkan ECA shipment plan (export.contdate), lengkap dengan jam tiba aktual
  * (cont.actcontdate) dan jam keluar (cont.gate_out_at).
  * Status container sama dengan daftar gate (GateController::decorate).
  * ?embed=exim: tampil di modal halaman Shipment Plan EXIM (tanpa tombol kembali ke security,

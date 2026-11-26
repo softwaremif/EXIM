@@ -60,6 +60,11 @@
                 #modalCreateContainer .gate-video { display: block; width: 157px; height: 88px; border-radius: 8px; background: #000; object-fit: cover; }
                 #modalCreateContainer .gate-media-group--video .gate-video:fullscreen { object-fit: contain; }
                 #modalCreateContainer .gate-empty { font-size: 13px; color: #8a94a3; }
+                #modalCreateContainer .mc-sync-buyer { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; padding: 1px 8px; border: 1px solid #c9d6f2; border-radius: 999px; background: #fff; color: #2F6FED; font-size: 12px; font-weight: 600; line-height: 18px; cursor: pointer; }
+                #modalCreateContainer .mc-sync-buyer:hover { background: #EAF2FF; }
+                #modalCreateContainer .mc-sync-buyer:disabled { opacity: .6; cursor: wait; }
+                #modalCreateContainer .mc-sync-buyer.is-busy i { animation: mcSpin 1s linear infinite; }
+                @keyframes mcSpin { to { transform: rotate(360deg); } }
             </style>
             <div class="mc-header">
                 <div class="mc-header-icon"><i class="bi bi-box-seam"></i></div>
@@ -68,6 +73,10 @@
                     <div class="mc-subtitle">
                         <span id="ordnop"></span>
                         <span id="buyerp"></span>
+                        {{-- buyer SP diambil ulang dari data MD (mis. SP dibuat sebelum MD mengisi buyer) --}}
+                        <button type="button" class="mc-sync-buyer" id="btnSyncBuyer" title="Sinkron buyer dari data MD">
+                            <i class="bi bi-arrow-repeat"></i> Sinkron buyer dari MD
+                        </button>
                         <span id="POnop"></span>
                     </div>
                 </div>

@@ -137,6 +137,9 @@ Route::middleware(['check'])->group(function () {
     Route::post('/security/gate/{contpk}/update', [GateController::class, 'update'])->name('security.gate.update');
     Route::post('/security/gate/{contpk}/stuffing', [GateController::class, 'stuffing'])->name('security.gate.stuffing');
     Route::post('/security/gate/{contpk}/seal', [GateController::class, 'seal'])->name('security.gate.seal');
+    // truk LCL dipakai beberapa SP: gabung SP baru / pisahkan SP yang tidak ikut truk ini
+    Route::post('/security/gate/{contpk}/trip/join', [GateController::class, 'tripJoin'])->name('security.gate.trip.join');
+    Route::post('/security/gate/{contpk}/trip/split', [GateController::class, 'tripSplit'])->name('security.gate.trip.split');
     // lokasi stuffing: container per factory & pintu (aktifkan / pindah MIF / batalkan)
     Route::post('/security/gate/{contpk}/door', [GateDoorController::class, 'activate'])->name('security.gate.door.activate');
     Route::post('/security/gate/{contpk}/door/move', [GateDoorController::class, 'move'])->name('security.gate.door.move');
@@ -256,6 +259,8 @@ Route::post('cancelinvs', [InvoiceController::class, 'cancelinvs'])->name('cance
 
     //add PO
     Route::get('/export/{exportpk}/available-po', [ShipplanController::class, 'availablePo'])->name('export.available-po');
+    // buyer shipment plan diperbarui dari data MD (po.buyer) untuk semua PO di SP
+    Route::post('/export/{exportpk}/sync-buyer', [ShipplanController::class, 'syncBuyer'])->name('export.sync-buyer');
     Route::post('/export/po-add', [ShipplanController::class, 'addPo'])->middleware('shipplan.owner')->name('export.po-add');
     // gabung beberapa shipment plan ke satu shipment (PO pindah, carton di-unload, shipment asal Cancel)
     Route::get('/export/{exportpk}/merge-candidates', [ShipplanController::class, 'mergeCandidates'])->name('export.merge-candidates');

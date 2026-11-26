@@ -691,3 +691,15 @@ a.sg-step__label { color: inherit; text-decoration: none; }
 .sg-sim__foot .sg-btn { flex: 1; }
 .sg-sim__upload { position: relative; align-self: flex-start; margin-top: var(--space-2); }
 .sg-upload[data-sim-open]:focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
+
+/* truk LCL dipakai beberapa shipment plan (partials/trip.blade.php, card, ceklis carton per SP) */
+.sg-trip { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.sg-trip--pending { margin-top: var(--space-3); }
+.sg-trip__item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface-raised); }
+.sg-trip__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.sg-trip__info strong { font-size: 15px; line-height: 20px; color: var(--ink); }
+.sg-trip__po { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sg-trip__count { font-weight: 400; color: var(--ink-muted); }
+.sg-trip__tag { flex: none; padding: 2px var(--space-2); border-radius: var(--radius-pill); background: var(--info-soft); color: var(--info); font: 600 12px/16px var(--font-sans); }
+.sg-card__pending { color: var(--warn); }
+.sg-chips--wrap { flex-wrap: wrap; overflow: visible; }

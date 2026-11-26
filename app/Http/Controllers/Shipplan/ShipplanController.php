@@ -3888,6 +3888,8 @@ class ShipplanController extends Controller
                 ->pluck('popk')->all();
 
             $this->syncExportPopks($exportpk, [], $removedPopks);
+            // buyer mengikuti PO yang tersisa (data MD terbaru)
+            $this->refreshExportBuyer($exportpk);
 
             DB::commit();
             $andon->commit();
@@ -3909,6 +3911,66 @@ class ShipplanController extends Controller
             'POno' => $newPOno,
             'OP' => $newOP,
         ]);
+    }
+
+    /**
+     * export.buyer dihitung ulang dari buyer terbaru di data MD (andon po.buyer) untuk semua PO shipment ini
+     * (poexport: POno + OP + poref). Dipanggil saat tambah / hapus PO dan tombol "Sinkron buyer dari MD",
+     * supaya SP yang dibuat sebelum MD mengisi buyer ikut terupdate. Buyer kosong / "-" diabaikan; kalau MD
+     * belum punya buyer sama sekali, buyer lama dipertahankan. Kolom varchar(50): buyer yang tidak muat dilewati.
+     */
+    private function refreshExportBuyer($exportpk): string
+    {
+        $andon = DB::connection('mysql_andon');
+        $buyers = [];
+        foreach (DB::table('poexport')->where('exportpk', $exportpk)->orderBy('poexportpk')->get(['POno', 'OP', 'poref']) as $r) {
+            $poref = trim((string) $r->poref);
+            $found = $andon->table('po')->where('POno', $r->POno)->where('OP', $r->OP)
+                ->where(fn($q) => $poref === '' ? $q->whereNull('poref')->orWhere('poref', '') : $q->where('poref', $poref))
+                ->pluck(self::PO_BUYER_COL);
+            foreach ($found as $b) {
+                $b = trim((string) $b);
+                if ($b !== '' && $b !== '-' && !in_array($b, $buyers, true)
+                    && strlen(implode(',', array_merge($buyers, [$b]))) <= 50) {
+                    $buyers[] = $b;
+                }
+            }
+        }
+
+        $current = (string) DB::table('export')->where('exportpk', $exportpk)->value('buyer');
+        if (!$buyers) {
+            return $current;
+        }
+        $buyer = implode(',', $buyers);
+        if ($buyer !== $current) {
+            DB::table('export')->where('exportpk', $exportpk)->update(['buyer' => $buyer]);
+        }
+        return $buyer;
+    }
+
+    // POST /export/{exportpk}/sync-buyer : tombol "Sinkron buyer dari MD" di modal Edit Shipment Plan
+    public function syncBuyer($exportpk)
+    {
+        $export = DB::table('export')->where('exportpk', $exportpk)->first(['exportpk', 'buyer', 'stscancel']);
+        if (!$export) {
+            return response()->json(['success' => false, 'message' => 'Shipment plan tidak ditemukan.'], 404);
+        }
+        if (!empty($export->stscancel)) {
+            return response()->json(['success' => false, 'message' => 'Shipment plan sudah dibatalkan.'], 422);
+        }
+
+        $old = trim((string) $export->buyer);
+        $buyer = $this->refreshExportBuyer($export->exportpk);
+        $label = implode(', ', $this->buyerList($buyer));
+        if ($buyer === '') {
+            $message = 'Buyer PO di data MD belum diisi. Minta MD mengisi buyer, lalu sinkron ulang.';
+        } elseif ($buyer === $old) {
+            $message = 'Buyer sudah sesuai data MD: ' . $label . '.';
+        } else {
+            $message = 'Buyer diperbarui dari data MD: ' . $label . '.';
+        }
+
+        return response()->json(['success' => $buyer !== '', 'buyer' => $label, 'changed' => $buyer !== $old, 'message' => $message]);
     }
 
     // export.popks dipakai available_cartons() sebagai daftar popk yang
@@ -4339,8 +4401,7 @@ class ShipplanController extends Controller
             $totQty  = 0;
             $skipped = [];
 
-            // PO ditambah per nomor PO / OP tanpa syarat buyer; buyer PO yang ditambahkan ikut dicatat di export.buyer
-            $buyers = $this->buyerList($export->buyer);   // bisa lebih dari satu buyer (dipisah koma)
+            // PO ditambah per nomor PO / OP tanpa syarat buyer; export.buyer dihitung ulang dari data MD (refreshExportBuyer)
 
             foreach ($items as $it) {
                 $pono  = trim($it['POno']);
@@ -4356,21 +4417,13 @@ class ShipplanController extends Controller
                 }
 
                 // PO harus ada di tabel po (buyer apa pun)
-                $poBuyers = $wherePoref($andon->table('po'), $poref)
+                $poOk = $wherePoref($andon->table('po'), $poref)
                     ->where('POno', $pono)->where('OP', $op)
-                    ->pluck(self::PO_BUYER_COL);
+                    ->exists();
 
-                if ($poBuyers->isEmpty()) {
+                if (!$poOk) {
                     $skipped[] = $pono . ' (PO tidak ditemukan)';
                     continue;
-                }
-                // export.buyer varchar(50): buyer baru hanya ditambah kalau masih muat (tidak terpotong diam-diam)
-                foreach ($poBuyers as $b) {
-                    $b = trim((string) $b);
-                    if ($b !== '' && $b !== '-' && !in_array($b, $buyers, true)
-                        && strlen(implode(',', array_merge($buyers, [$b]))) <= 50) {
-                        $buyers[] = $b;
-                    }
                 }
 
                 // tabel pack hanya dibaca untuk total ctn/qty, tidak diubah --
@@ -4431,12 +4484,13 @@ class ShipplanController extends Controller
             DB::table('export')->where('exportpk', $exportpk)->update([
                 'POno'     => implode($sep, array_values(array_unique($ponos))),
                 'OP'       => implode($sep, array_values(array_unique($ops))),
-                'buyer'    => implode(',', $buyers),
                 'totctn'   => DB::raw('COALESCE(totctn,0) + ' . (int) $totCtn),
                 'qty_list' => DB::raw('COALESCE(qty_list,0) + ' . (int) $totQty),
             ]);
 
             $this->syncExportPopks($exportpk, $addedPopks);
+            // buyer semua PO shipment ini (termasuk PO lama yang buyer-nya baru diisi MD)
+            $this->refreshExportBuyer($exportpk);
 
             DB::commit();
 

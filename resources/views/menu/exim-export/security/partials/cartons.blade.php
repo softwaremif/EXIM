@@ -164,16 +164,30 @@
 </style>
 
 @php
+    // truk LCL dipakai beberapa SP: ceklis carton per SP ($s->ck = SP yang dipilih, ?sp=contpk)
+    $ck = $s->ck ?? $s;
+    $ckSps = ($s->members ?? collect())->count() > 1 ? $s->members : collect();
     // QR untuk tim stuffing (sistem Packing List): container tiba & belum keluar -> scan -> langsung ke container ini.
-    $stuffQrUrl = !$s->departed_at && $s->exportpk
-        ? rtrim((string) config('services.packing.url'), '/') . '/shipment/scanner?exportpk=' . $s->exportpk . '&cont=' . $s->contpk
+    $stuffQrUrl = !$s->departed_at && $ck->exportpk
+        ? rtrim((string) config('services.packing.url'), '/') . '/shipment/scanner?exportpk=' . $ck->exportpk . '&cont=' . $ck->contpk
         : null;
 @endphp
 {{-- $panel: tab halaman detail tempat ringkasan ini tampil; modal di bawah sengaja di luar tab supaya tetap bisa dibuka (scan stuffing) --}}
-<section class="sg-section" id="ckSection" @isset($panel) data-panel="{{ $panel }}" role="tabpanel" @endisset data-url="{{ route('security.gate.cartons', $s->contpk) }}"
-    data-check-url="{{ route('security.gate.cartons.check', $s->contpk) }}" data-detail-url="{{ route('security.gate.cartons.detail', $s->contpk) }}">
+<section class="sg-section" id="ckSection" @isset($panel) data-panel="{{ $panel }}" role="tabpanel" @endisset data-url="{{ route('security.gate.cartons', $ck->contpk) }}"
+    data-check-url="{{ route('security.gate.cartons.check', $ck->contpk) }}" data-detail-url="{{ route('security.gate.cartons.detail', $ck->contpk) }}">
+    @if ($ckSps->isNotEmpty())
+        {{-- pindah SP memuat ulang halaman; ?sp= membuka tab Muat (done.blade.php data-start-tab) --}}
+        <nav class="sg-chips sg-chips--wrap" aria-label="Pilih shipment untuk ceklis carton">
+            @foreach ($ckSps as $m)
+                <a class="sg-chip {{ $m->contpk == $ck->contpk ? 'is-active' : '' }}"
+                    href="{{ route('security.gate.index', array_filter(['filter' => $filter, 'q' => $q, 'cont' => $s->contpk, 'sp' => $m->contpk])) }}">
+                    {{ $m->idship }} <span class="sg-chip__count">{{ $m->buyer }}</span>
+                </a>
+            @endforeach
+        </nav>
+    @endif
     <div class="sg-section__head">
-        <h2 class="sg-section__title">Ceklis carton</h2>
+        <h2 class="sg-section__title">Ceklis carton{{ $ckSps->isNotEmpty() ? ' · ' . $ck->idship : '' }}</h2>
         @if ($stuffQrUrl)
             <button type="button" class="sg-btn sg-btn--ghost sg-btn--sm" id="ckQrOpen" title="QR untuk tim stuffing: scan dari sistem stuffing untuk langsung membuka container ini">@include('menu.exim-export.security.partials.icon', ['name' => 'qr']) QR stuffing</button>
         @endif
@@ -202,15 +216,16 @@
     <div class="ck-head">
         <div class="ck-head__row">
             <button type="button" class="sg-btn sg-btn--ghost sg-btn--icon" data-ck-close aria-label="Tutup">@include('menu.exim-export.security.partials.icon', ['name' => 'back'])</button>
-            <h2 class="ck-head__title" id="ckTitle">Ceklis carton<small>{{ $s->is_lcl ? 'LCL' : 'Container' }} {{ $s->ident ?: '-' }} · {{ $s->idship }}</small></h2>
+            <h2 class="ck-head__title" id="ckTitle">Ceklis carton<small>{{ $s->is_lcl ? 'LCL' : 'Container' }} {{ $s->ident ?: '-' }} · {{ $ck->idship }}</small></h2>
             <button type="button" class="sg-btn sg-btn--ghost sg-btn--icon" id="ckReloadIn" aria-label="Muat ulang data">@include('menu.exim-export.security.partials.icon', ['name' => 'refresh'])</button>
         </div>
         @php
             $fmtJam = fn($t) => $t ? \Carbon\Carbon::parse($t)->isoFormat('D MMM, HH:mm') : null;
-            $poList = array_values(array_filter(array_map('trim', explode(',', (string) $s->POno))));
+            // shipment / buyer / PO mengikuti SP yang dipilih (truk LCL bersama); data truk dari SP induk
+            $poList = array_values(array_filter(array_map('trim', explode(',', (string) $ck->POno))));
             $shipInfo = array_filter([
-                ['Shipment', $s->idship, true],
-                ['Buyer', $s->buyer, false],
+                ['Shipment', $ck->idship, true],
+                ['Buyer', $ck->buyer, false],
                 ['PO', $poList ? $poList[0] . (count($poList) > 1 ? ' +' . (count($poList) - 1) . ' PO' : '') : null, true, implode(', ', $poList)],
                 ['Tujuan', $s->port_name ?: $s->gate_country, false],
                 ['Jenis', $s->type_label, false],
@@ -287,7 +302,7 @@
         data-qr="{{ $stuffQrUrl }}" data-lib="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">
         <div class="ck-sheet__panel">
             <div class="ck-sheet__head">
-                <h3 class="ck-sheet__title" id="ckQrTitle">{{ $s->ident ?: '-' }}<small>QR stuffing · {{ $s->idship }}</small></h3>
+                <h3 class="ck-sheet__title" id="ckQrTitle">{{ $s->ident ?: '-' }}<small>QR stuffing · {{ $ck->idship }}</small></h3>
                 <button type="button" class="sg-btn sg-btn--ghost sg-btn--icon" data-qr-close aria-label="Tutup">@include('menu.exim-export.security.partials.icon', ['name' => 'close'])</button>
             </div>
             <div class="ck-qr" id="ckQrBox"></div>

@@ -3056,11 +3056,13 @@
             function initGrid() {
                 $('#dgShipmentPlan').datagrid({
                     url: "{{ route('shipplan.getListExportGrouped') }}",
-                    // pemuatan pertama ikut checkbox "Tampilkan cancel" (lihat showCancelParam)
-                    queryParams: {
+                    // pemuatan pertama ikut checkbox "Tampilkan cancel" (lihat showCancelParam) dan filter
+                    // tersimpan (kembali dari view detail, lihat restoreSpFilters)
+                    queryParams: Object.assign({}, window.spRestoredParams || {}, {
                         show_cancel: showCancelParam(),
                         show_merge: showMergeParam()
-                    },
+                    }),
+                    pageNumber: readSpState().page || 1,
                     view: detailview,
                     width: '100%',
                     height: 'auto',
@@ -3331,6 +3333,9 @@
                         return !isRowCancelled(row);
                     },
                     onLoadSuccess: function(data) {
+                        // halaman yang sedang dibuka ikut disimpan (kembali dari view detail ke halaman yang sama)
+                        saveSpState({ page: $(this).datagrid('options').pageNumber || 1 });
+
                         // data baru -> pilihan PO lama dilepas (sama seperti
                         // checkbox datagrid yang ter-reset saat load)
                         const hadChecks = checkedPos.size > 0;
@@ -3481,18 +3486,90 @@
             };
 
             window.reloadSpGrid = function() {
-                $('#dgShipmentPlan').datagrid('load', {
-                    q: document.getElementById('spSearch').value || '',
-                    buyer: document.getElementById('spFilterBuyer').value || '',
-                    vassal: document.getElementById('spFilterVassal').value || '',
-                    sortlistByDate: document.getElementById('sortlistByDate').value || '',
-                    status: document.getElementById('spFilterStatus').value || '',
-                    searchByRangeDay: $('#filterday').combobox('getValue') || '',
-                    searchByRangeEca: $('#filterdayEca').combobox('getValue') || '',
+                const filters = spFilterParams();
+                // filter & halaman disimpan per tab supaya tetap ada setelah buka view detail lalu kembali
+                saveSpState({ filters: filters, page: 1 });
+                $('#dgShipmentPlan').datagrid('load', Object.assign({}, filters, {
                     show_cancel: showCancelParam(),
                     show_merge: showMergeParam(),
-                });
+                }));
             };
+
+            window.spFilterParams = function() {
+                return {
+                    q: document.getElementById('spSearch').value || '',
+                    buyer: $('#spFilterBuyer').combobox('getValue') || '',
+                    vassal: $('#spFilterVassal').combobox('getValue') || '',
+                    sortlistByDate: document.getElementById('sortlistByDate').value || '',
+                    status: $('#spFilterStatus').combobox('getValue') || '',
+                    searchByRangeDay: $('#filterday').combobox('getValue') || '',
+                    searchByRangeEca: $('#filterdayEca').combobox('getValue') || '',
+                };
+            };
+
+            // ---------- simpan / pulihkan filter daftar shipment plan (sessionStorage, per tab browser) ----------
+            const SP_STATE_KEY = 'spListState';
+
+            function readSpState() {
+                try {
+                    return JSON.parse(sessionStorage.getItem(SP_STATE_KEY) || 'null') || {};
+                } catch (e) {
+                    return {};
+                }
+            }
+
+            function saveSpState(patch) {
+                try {
+                    sessionStorage.setItem(SP_STATE_KEY, JSON.stringify(Object.assign(readSpState(), patch)));
+                } catch (e) {}
+            }
+
+            // isi ulang kotak filter dari state tersimpan; onChange combobox tidak memicu muat ulang (spRestoring)
+            function restoreSpFilters() {
+                const f = readSpState().filters;
+                // tanpa state tersimpan: tetap pakai nilai yang tampil (bisa dipulihkan browser saat tombol Back)
+                if (!f) return currentSpParams();
+                window.spRestoring = true;
+                try {
+                    document.getElementById('spSearch').value = f.q || '';
+                    [
+                        ['#spFilterBuyer', f.buyer],
+                        ['#spFilterVassal', f.vassal],
+                        ['#spFilterStatus', f.status],
+                        ['#filterday', f.searchByRangeDay],
+                        ['#filterdayEca', f.searchByRangeEca],
+                    ].forEach(([sel, val]) => {
+                        if (val) $(sel).combobox('setValue', val);
+                    });
+                    if (f.sortlistByDate) sortlistByDate(f.sortlistByDate);
+                } catch (e) {
+                    // filter gagal dipulihkan: grid tetap dimuat dengan filter yang berhasil terisi
+                } finally {
+                    window.spRestoring = false;
+                }
+                return currentSpParams();
+            }
+
+            // filter yang sedang tampil di layar (combobox belum siap -> {})
+            function currentSpParams() {
+                try {
+                    return spFilterParams();
+                } catch (e) {
+                    return {};
+                }
+            }
+
+            // browser bisa mengisi ulang form setelah script berjalan (tombol Back): kalau filter yang tampil
+            // berbeda dengan filter pemuatan pertama, grid dimuat ulang supaya data sesuai filter di layar
+            function syncSpGridWithFilters() {
+                const now = currentSpParams();
+                if (JSON.stringify(now) !== JSON.stringify(window.spRestoredParams || {})) {
+                    window.spRestoredParams = now;
+                    reloadSpGrid();
+                } else {
+                    saveSpState({ filters: now });
+                }
+            }
 
             // checkbox "Tampilkan cancel": bawaan tidak dicentang (shipment cancel disembunyikan).
             // Filter Status = Cancel Shipment tetap menampilkan yang cancel walau tidak dicentang.
@@ -3528,6 +3605,7 @@
 
             let searchTimer = null;
             window.onSpSearch = function() {
+                if (window.spRestoring) return;   // sedang memulihkan filter tersimpan (restoreSpFilters)
                 clearTimeout(searchTimer);
                 searchTimer = setTimeout(reloadSpGrid, 350);
             };
@@ -3563,7 +3641,14 @@
                 return new Intl.NumberFormat('id-ID').format(Number(n) || 0);
             }
 
+            // filter terakhir (tab browser ini) dipulihkan dulu, lalu grid dimuat sekali dengan filter yang tampil
+            window.spRestoredParams = restoreSpFilters();
             initGrid();
+            if (document.readyState === 'complete') {
+                setTimeout(syncSpGridWithFilters, 300);
+            } else {
+                window.addEventListener('load', () => setTimeout(syncSpGridWithFilters, 300), { once: true });
+            }
 
             //Untuk menu drodown tabel
             let activeActionRow = null;
@@ -7198,6 +7283,39 @@
                 (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
                 loadList();
             };
+        })();
+
+        // ---------- modal Edit Shipment Plan: sinkron buyer dari data MD (po.buyer semua PO di SP) ----------
+        (function() {
+            const notify = (msg, type) => typeof showToast === 'function' ? showToast(msg, type) : appAlert(msg, { type });
+            // delegasi: modal bisa dirender setelah script ini
+            document.addEventListener('click', async function(e) {
+                const btn = e.target.closest('#btnSyncBuyer');
+                if (!btn || btn.disabled) return;
+                const exportpk = document.getElementById('exportpk').value;
+                if (!exportpk) return;
+                btn.disabled = true;
+                btn.classList.add('is-busy');
+                try {
+                    const url = '{{ route('export.sync-buyer', ['exportpk' => '__ID__']) }}'.replace('__ID__', exportpk);
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json'
+                        }
+                    });
+                    const json = await res.json().catch(() => ({}));
+                    if (json.buyer) $('#buyerp').text('BUYER : ' + json.buyer);
+                    notify(json.message || 'Gagal sinkron buyer.', json.success ? 'success' : 'error');
+                    if (json.changed && typeof window.reloadSpGrid === 'function') window.reloadSpGrid();
+                } catch (e) {
+                    notify('Gagal sinkron buyer.', 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.classList.remove('is-busy');
+                }
+            });
         })();
     </script>
     @include('menu.exim-export.shipplan.modal.modalPackingListPdfJs')
