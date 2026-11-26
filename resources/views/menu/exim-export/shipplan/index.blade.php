@@ -3053,6 +3053,8 @@
                 `;
             }
 
+            let spLoadSeq = 0;   // nomor request daftar shipment plan (lihat loader di initGrid)
+
             function initGrid() {
                 $('#dgShipmentPlan').datagrid({
                     url: "{{ route('shipplan.getListExportGrouped') }}",
@@ -3063,6 +3065,25 @@
                         show_merge: showMergeParam()
                     }),
                     pageNumber: readSpState().page || 1,
+                    // hanya respons request TERAKHIR yang ditampilkan: respons lama yang datang belakangan
+                    // (mis. tanpa filter, datanya besar) tidak boleh menimpa hasil filter terbaru
+                    loader: function(param, success, error) {
+                        const opts = $(this).datagrid('options');
+                        if (!opts.url) return false;
+                        const seq = ++spLoadSeq;
+                        $.ajax({
+                            type: opts.method,
+                            url: opts.url,
+                            data: param,
+                            dataType: 'json',
+                            success: function(data) {
+                                if (seq === spLoadSeq) success(data);
+                            },
+                            error: function() {
+                                if (seq === spLoadSeq) error.apply(this, arguments);
+                            }
+                        });
+                    },
                     view: detailview,
                     width: '100%',
                     height: 'auto',
@@ -3525,13 +3546,16 @@
             }
 
             // isi ulang kotak filter dari state tersimpan; onChange combobox tidak memicu muat ulang (spRestoring)
+            // Mengembalikan filter untuk pemuatan pertama grid. State tersimpan dipakai langsung (tidak menunggu
+            // combobox EasyUI siap dibaca); combobox yang belum siap diisi ulang lagi oleh syncSpGridWithFilters.
             function restoreSpFilters() {
                 const f = readSpState().filters;
-                // tanpa state tersimpan: tetap pakai nilai yang tampil (bisa dipulihkan browser saat tombol Back)
+                // tanpa state tersimpan: pakai nilai yang tampil (bisa dipulihkan browser saat tombol Back)
                 if (!f) return currentSpParams();
                 window.spRestoring = true;
                 try {
-                    document.getElementById('spSearch').value = f.q || '';
+                    const search = document.getElementById('spSearch');
+                    if (search) search.value = f.q || '';
                     [
                         ['#spFilterBuyer', f.buyer],
                         ['#spFilterVassal', f.vassal],
@@ -3539,15 +3563,21 @@
                         ['#filterday', f.searchByRangeDay],
                         ['#filterdayEca', f.searchByRangeEca],
                     ].forEach(([sel, val]) => {
-                        if (val) $(sel).combobox('setValue', val);
+                        try {
+                            if (val && $(sel).combobox('getValue') != val) $(sel).combobox('setValue', val);
+                        } catch (e) {} // combobox belum dibuat EasyUI: diisi ulang setelah halaman selesai dimuat
                     });
-                    if (f.sortlistByDate) sortlistByDate(f.sortlistByDate);
-                } catch (e) {
-                    // filter gagal dipulihkan: grid tetap dimuat dengan filter yang berhasil terisi
+                    try {
+                        if (f.sortlistByDate && document.getElementById('sortlistByDate').value != f.sortlistByDate) {
+                            sortlistByDate(f.sortlistByDate);
+                        }
+                    } catch (e) {}
                 } finally {
                     window.spRestoring = false;
                 }
-                return currentSpParams();
+                return Object.assign({
+                    q: '', buyer: '', vassal: '', sortlistByDate: '', status: '', searchByRangeDay: '', searchByRangeEca: ''
+                }, f);
             }
 
             // filter yang sedang tampil di layar (combobox belum siap -> {})
@@ -3562,7 +3592,9 @@
             // browser bisa mengisi ulang form setelah script berjalan (tombol Back): kalau filter yang tampil
             // berbeda dengan filter pemuatan pertama, grid dimuat ulang supaya data sesuai filter di layar
             function syncSpGridWithFilters() {
+                restoreSpFilters();   // combobox yang tadi belum siap diisi nilai tersimpan
                 const now = currentSpParams();
+                if (!Object.keys(now).length) return;   // combobox masih belum siap: pakai filter pemuatan pertama
                 if (JSON.stringify(now) !== JSON.stringify(window.spRestoredParams || {})) {
                     window.spRestoredParams = now;
                     reloadSpGrid();
