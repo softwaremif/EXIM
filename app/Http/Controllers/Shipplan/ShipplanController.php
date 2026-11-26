@@ -1481,7 +1481,9 @@ class ShipplanController extends Controller
         }
         // jejak edit hanya ada di cont (tidak diarsipkan), tetap dikosongkan untuk container pengganti
         $editCols = array_values(array_intersect(GateController::EDIT_COLUMNS, $contCols));
-        $reset = array_fill_keys(array_merge(['nopol', 'noseal', 'actcontdate'], $gateCols, $editCols), null);
+        // container pengganti juga lepas dari grup truk LCL (dikelompokkan ulang menurut plat + ETA baru)
+        $tripCols = array_values(array_intersect([GateController::TRIP_COLUMN], $contCols));
+        $reset = array_fill_keys(array_merge(['nopol', 'noseal', 'actcontdate'], $gateCols, $editCols, $tripCols), null);
         $reset['contno'] = !empty($v['contno']) ? strtoupper(preg_replace('/\s+/', '', $v['contno'])) : null;
 
         DB::transaction(function () use ($cont, $history, $reset) {
@@ -2229,7 +2231,9 @@ class ShipplanController extends Controller
      */
     private function gateLeaveInfo($c): array
     {
-        $url = fn($f) => is_string($f) && $f !== '' ? asset('public/upload/gate/' . (int) $c->contpk . '/' . $f) : null;
+        // truk LCL dipakai beberapa SP: file foto ada di folder SP induk (cont.gate_trip)
+        $mediaPk = (int) ($c->{GateController::TRIP_COLUMN} ?? 0) > 0 ? (int) $c->{GateController::TRIP_COLUMN} : (int) $c->contpk;
+        $url = fn($f) => is_string($f) && $f !== '' ? asset('public/upload/gate/' . $mediaPk . '/' . $f) : null;
         $raw = json_decode($c->{GateController::OUT_MEDIA_COLUMN} ?? '[]', true) ?: [];
         $media = [];
         foreach (GateController::OUT_PHOTO_KINDS as $kind => [$label]) {
@@ -2265,7 +2269,7 @@ class ShipplanController extends Controller
         }
 
         // data keluar dari security (tab Container Leave), hanya kolom yang sudah ada
-        $gateCols = array_values(array_intersect(['gate_out_at', 'gate_result', GateController::OUT_MEDIA_COLUMN], Schema::getColumnListing('cont')));
+        $gateCols = array_values(array_intersect(['gate_out_at', 'gate_result', GateController::OUT_MEDIA_COLUMN, GateController::TRIP_COLUMN], Schema::getColumnListing('cont')));
 
         $containers = DB::table('cont')
             ->where('exportpk', $exportpk)
@@ -4188,10 +4192,17 @@ class ShipplanController extends Controller
             return response()->json(['success' => false, 'message' => 'Shipment plan tidak ditemukan.'], 404);
         }
         $buyer = trim((string) $export->buyer);
-        // shipment bisa berisi beberapa buyer (export.buyer "PERRY ELLIS,PE NIKE"): PO dari salah satunya boleh ditambah
+        // PO dicari per nomor PO / OP di semua buyer. Tanpa kata kunci, daftar awal = PO buyer shipment ini
+        // (export.buyer bisa beberapa: "PERRY ELLIS,PE NIKE"); buyer kosong -> minta ketik nomor PO.
         $buyers = $this->buyerList($buyer);
-        if (!$buyers) {
-            return response()->json(['success' => false, 'message' => 'Buyer shipment plan ini belum terisi.'], 422);
+        $idship = 'SP' . str_pad($export->exportpk, 4, '0', STR_PAD_LEFT);
+        if ($search === '' && !$buyers) {
+            return response()->json(['success' => true, 'buyer' => '', 'idship' => $idship, 'data' => [],
+                'hint' => 'Ketik nomor PO / OP untuk mencari PO.']);
+        }
+        if ($search !== '' && mb_strlen($search) < 3) {
+            return response()->json(['success' => true, 'buyer' => implode(', ', $buyers), 'idship' => $idship, 'data' => [],
+                'hint' => 'Ketik minimal 3 karakter nomor PO / OP.']);
         }
 
         $existing = [];
@@ -4203,7 +4214,7 @@ class ShipplanController extends Controller
         $qa = $andon->table('pack as p')
             ->join('po', 'po.popk', '=', 'p.popk')
             ->whereNull('p.exportpk')
-            ->whereIn('po.' . self::PACK_BUYER_COL, $buyers)
+            ->when($search === '', fn($q) => $q->whereIn('po.' . self::PACK_BUYER_COL, $buyers))
             ->groupBy('p.POno', 'p.OP', 'po.poref')
             ->selectRaw('p.POno, p.OP, po.poref, MAX(po.' . self::PO_BUYER_COL . ') as buyer, COUNT(*) as ctn, SUM(p.pcsp) as qty')
             ->orderBy('p.OP', 'DESC')
@@ -4211,7 +4222,7 @@ class ShipplanController extends Controller
 
         // B) PO yang belum ada packnya sama sekali -> langsung dari tabel po
         $qb = $andon->table('po')
-            ->whereIn('po.' . self::PO_BUYER_COL, $buyers)
+            ->when($search === '', fn($q) => $q->whereIn('po.' . self::PO_BUYER_COL, $buyers))
             ->whereNotExists(function ($q) {
                 $q->select(DB::raw(1))->from('pack')->whereRaw('pack.popk = po.popk');
             })
@@ -4267,14 +4278,14 @@ class ShipplanController extends Controller
         }
 
         foreach ($rows as $r) {
-            $r->buyer = trim((string) $r->buyer) ?: $buyer;
+            $r->buyer = trim((string) $r->buyer);
             $r->shipplans = array_values(array_unique($shipplanMap[$r->POno . '|' . $r->OP] ?? []));
         }
 
         return response()->json([
             'success' => true,
             'buyer'   => implode(', ', $buyers),
-            'idship'  => 'SP' . str_pad($export->exportpk, 4, '0', STR_PAD_LEFT),
+            'idship'  => $idship,
             'data'    => $rows,
         ]);
     }
@@ -4328,11 +4339,8 @@ class ShipplanController extends Controller
             $totQty  = 0;
             $skipped = [];
 
+            // PO ditambah per nomor PO / OP tanpa syarat buyer; buyer PO yang ditambahkan ikut dicatat di export.buyer
             $buyers = $this->buyerList($export->buyer);   // bisa lebih dari satu buyer (dipisah koma)
-            if (!$buyers) {
-                DB::rollBack();
-                return response()->json(['success' => false, 'message' => 'Buyer shipment plan ini belum terisi.'], 422);
-            }
 
             foreach ($items as $it) {
                 $pono  = trim($it['POno']);
@@ -4347,15 +4355,22 @@ class ShipplanController extends Controller
                     continue;
                 }
 
-                // PO harus ada di tabel po dengan buyer yang sama
-                $poOk = $wherePoref($andon->table('po'), $poref)
+                // PO harus ada di tabel po (buyer apa pun)
+                $poBuyers = $wherePoref($andon->table('po'), $poref)
                     ->where('POno', $pono)->where('OP', $op)
-                    ->whereIn('po.' . self::PO_BUYER_COL, $buyers)
-                    ->exists();
+                    ->pluck(self::PO_BUYER_COL);
 
-                if (!$poOk) {
-                    $skipped[] = $pono . ' (PO tidak ditemukan / beda buyer)';
+                if ($poBuyers->isEmpty()) {
+                    $skipped[] = $pono . ' (PO tidak ditemukan)';
                     continue;
+                }
+                // export.buyer varchar(50): buyer baru hanya ditambah kalau masih muat (tidak terpotong diam-diam)
+                foreach ($poBuyers as $b) {
+                    $b = trim((string) $b);
+                    if ($b !== '' && $b !== '-' && !in_array($b, $buyers, true)
+                        && strlen(implode(',', array_merge($buyers, [$b]))) <= 50) {
+                        $buyers[] = $b;
+                    }
                 }
 
                 // tabel pack hanya dibaca untuk total ctn/qty, tidak diubah --
@@ -4364,9 +4379,8 @@ class ShipplanController extends Controller
                     ->whereNull('exportpk')
                     ->where('POno', $pono)
                     ->where('OP', $op)
-                    ->whereIn('popk', function ($q) use ($poref, $buyers, $wherePoref) {
-                        $q->select('popk')->from('po')
-                            ->whereIn(self::PO_BUYER_COL, $buyers);   // buyer dari tabel po
+                    ->whereIn('popk', function ($q) use ($poref, $pono, $op, $wherePoref) {
+                        $q->select('popk')->from('po')->where('POno', $pono)->where('OP', $op);
                         $wherePoref($q, $poref);
                     })
                     ->selectRaw('COUNT(*) as ctn, COALESCE(SUM(pcsp),0) as qty')
@@ -4387,7 +4401,6 @@ class ShipplanController extends Controller
                     $addedPopks,
                     $wherePoref($andon->table('po'), $poref)
                         ->where('POno', $pono)->where('OP', $op)
-                        ->whereIn(self::PO_BUYER_COL, $buyers)
                         ->pluck('popk')->all()
                 );
 
@@ -4418,6 +4431,7 @@ class ShipplanController extends Controller
             DB::table('export')->where('exportpk', $exportpk)->update([
                 'POno'     => implode($sep, array_values(array_unique($ponos))),
                 'OP'       => implode($sep, array_values(array_unique($ops))),
+                'buyer'    => implode(',', $buyers),
                 'totctn'   => DB::raw('COALESCE(totctn,0) + ' . (int) $totCtn),
                 'qty_list' => DB::raw('COALESCE(qty_list,0) + ' . (int) $totQty),
             ]);

@@ -6660,9 +6660,12 @@
                     }
 
                     const rows = json.data || [];
-                    document.getElementById('apoTotal').textContent = rows.length + ' PO tersedia';
+                    document.getElementById('apoTotal').textContent = json.hint ? '' : rows.length + ' PO tersedia';
                     if (!rows.length) {
-                        body.innerHTML = stateRow('<i class="bi bi-inbox me-1"></i> Tidak ada PO yang tersedia.');
+                        // hint: buyer shipment kosong / kata kunci terlalu pendek -> PO dicari per nomor PO / OP
+                        body.innerHTML = json.hint
+                            ? stateRow('<i class="bi bi-search me-1"></i> ' + esc(json.hint))
+                            : stateRow('<i class="bi bi-inbox me-1"></i> Tidak ada PO yang tersedia.');
                         return;
                     }
                     const currentId = 'SP' + String(apoExportpk).padStart(4, '0');
