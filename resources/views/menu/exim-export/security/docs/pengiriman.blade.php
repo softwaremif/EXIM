@@ -4,7 +4,7 @@
     @php
         $jam = fn($v) => $v ? \Carbon\Carbon::parse($v)->format('H.i') . ' WIB · ' . \Carbon\Carbon::parse($v)->format('d-m-Y') : '';
         $tgl = $s->gate_load_at ?? null ?: ($s->gate_open_at ?? null);
-        // NRK (harian lepas ditandai)
+        // nama + NRK
         $person = fn($p) => e($p['nama']) . ' <span class="sub">' . e(\App\Http\Controllers\Security\GateController::personMeta(array_diff_key($p, ['depnm' => 1]))) . '</span>';
     @endphp
     <dl class="fields">

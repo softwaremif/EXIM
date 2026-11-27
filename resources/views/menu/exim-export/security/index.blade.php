@@ -1439,7 +1439,7 @@
         }
         // keterangan di bawah nama (sama dengan GateController::personMeta)
         function personMeta(emp) {
-            return ['NRK ' + emp.karid, emp.src === 'hl' ? 'Harian lepas' : '', emp.depnm].filter(Boolean).join(' · ');
+            return ['NRK ' + emp.karid, emp.depnm].filter(Boolean).join(' · ');
         }
         // ---- daftar petugas (orang muat, security): tambah dari scan, hapus per orang ----
         function syncPeople(list) {
@@ -1455,7 +1455,7 @@
             if (inputs.some(i => i.value === token)) return `${emp.nama} sudah ada di daftar ${list.dataset.label.toLowerCase()}.`;
             if (inputs.length >= parseInt(list.dataset.max, 10)) return `${list.dataset.label} maksimal ${list.dataset.max} orang.`;
             const li = document.createElement('li');
-            li.className = 'sg-people__item' + (emp.src === 'hl' ? ' is-hl' : '');
+            li.className = 'sg-people__item';
             li.innerHTML = `<input type="hidden"><span class="sg-person__body"><strong></strong><small></small></span>
                 <button type="button" class="sg-btn sg-btn--ghost sg-btn--icon" data-people-remove>${document.querySelector('[data-icon-close]').innerHTML}</button>`;
             const input = li.querySelector('input');
@@ -1635,7 +1635,7 @@
             list.forEach(emp => {
                 const li = document.createElement('li');
                 li.innerHTML = '<button type="button" class="sg-scan__result"><strong></strong><dl></dl></button>';
-                li.querySelector('strong').textContent = emp.nama + (emp.src === 'hl' ? ' (harian lepas)' : '');
+                li.querySelector('strong').textContent = emp.nama;
                 const dl = li.querySelector('dl');
                 [['NRK', emp.karid], ['Department', emp.depnm]]
                     .forEach(([k, v]) => {

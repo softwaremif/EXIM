@@ -18,6 +18,12 @@ class ShipplanAccess
 
     private static $ownerGroups = [];
 
+    // Manager EXIM (eko@ptmorich.com): satu-satunya yang boleh menyatukan / melepas SP LCL dalam satu truk
+    public static function isManager(): bool
+    {
+        return (int) Session::get('userpk') === self::MANAGER_USERPK;
+    }
+
     public static function canEdit($exportpk): bool
     {
         if ((int) Session::get('userpk') === self::MANAGER_USERPK) {

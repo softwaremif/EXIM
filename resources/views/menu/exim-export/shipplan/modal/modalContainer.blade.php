@@ -78,6 +78,8 @@
                             <i class="bi bi-arrow-repeat"></i> Sinkron buyer dari MD
                         </button>
                         <span id="POnop"></span>
+                        {{-- truk LCL bersama (diatur Manager EXIM lewat menu "Satu truk (LCL)") --}}
+                        <span id="truckp"></span>
                     </div>
                 </div>
                 <button type="button" class="mc-close" data-bs-dismiss="modal" aria-label="Close">

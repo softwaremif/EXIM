@@ -14,7 +14,7 @@
         data-hl="{{ $sources['hl'] ? 1 : 0 }}">
         <ol class="sg-people__list" data-people-list>
             @foreach ($people as $p)
-                <li class="sg-people__item {{ ($p['src'] ?? 'hrd') === 'hl' ? 'is-hl' : '' }}">
+                <li class="sg-people__item">
                     <input type="hidden" name="{{ $name }}[]" value="{{ $gate::personToken($p) }}">
                     <span class="sg-person__body">
                         <strong>{{ $p['nama'] }}</strong>

@@ -11,10 +11,13 @@ use Illuminate\Support\Facades\Session;
 use App\Models\Container;
 use App\Models\Export;
 use App\Models\Exportdt;
+use App\Services\LclTrip;
+use App\Services\ShipplanAccess;
 use App\Services\StuffingProgress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -2338,7 +2341,24 @@ class ShipplanController extends Controller
             'OP'  => implode(', ', array_unique(array_map('trim', explode(',', $export->OP)))),
             'POno'  => $export->POno,
             'buyer' => implode(', ', array_unique(array_map('trim', explode(',', $export->buyer)))),
+            // truk LCL bersama: SP lain di truk yang sama (diatur Manager EXIM, aksi "Satu truk (LCL)")
+            'truck' => $this->truckIdships($exportpk),
         ]);
+    }
+
+    // "SP0092, SP0093, ..." kalau container LCL shipment ini satu truk dengan SP lain; null kalau tidak
+    private function truckIdships($exportpk): ?string
+    {
+        if (!LclTrip::ready()) {
+            return null;
+        }
+        $col = GateController::TRIP_COLUMN;
+        $trip = DB::table('cont')->where('exportpk', $exportpk)->where($col, '>', 0)->value($col);
+        if (!$trip) {
+            return null;
+        }
+        $ids = DB::table('cont')->where($col, $trip)->orderBy('contpk')->pluck('exportpk')->unique();
+        return $ids->count() > 1 ? $ids->map(fn($x) => $this->idship($x))->implode(', ') : null;
     }
 
     public function togglePublish(Request $request)
@@ -3971,6 +3991,257 @@ class ShipplanController extends Controller
         }
 
         return response()->json(['success' => $buyer !== '', 'buyer' => $label, 'changed' => $buyer !== $old, 'message' => $message]);
+    }
+
+    // ====================================================================
+    // Satu truk LCL untuk beberapa shipment plan (khusus Manager EXIM). Data truk diisi Security Gate
+    // sekali di SP induk lalu disalin ke SP anggota (App\Services\LclTrip, GateController::TRIP_COLUMN).
+    // ====================================================================
+
+    private function idship($exportpk): string
+    {
+        return 'SP' . str_pad((int) $exportpk, 4, '0', STR_PAD_LEFT);
+    }
+
+    // satu-satunya container LCL shipment plan: [cont, null] atau [null, pesan error]
+    private function lclCont($exportpk): array
+    {
+        $lcl = DB::table('cont')->where('exportpk', $exportpk)->get()
+            ->filter(fn($c) => strtolower(trim((string) $c->type)) === 'lcl');
+        if ($lcl->isEmpty()) {
+            return [null, $this->idship($exportpk) . ' bukan LCL (tidak ada container bertipe LCL).'];
+        }
+        if ($lcl->count() > 1) {
+            return [null, $this->idship($exportpk) . ' punya lebih dari 1 container LCL.'];
+        }
+        return [$lcl->first(), null];
+    }
+
+    // baris SP untuk modal Satu truk: ID, buyer, PO, ECA, plat, PIC EXIM
+    private function truckRows($rows): array
+    {
+        $pics = DB::connection('mysql_akses')->table('user')
+            ->whereIn('userpk', collect($rows)->pluck('userpk')->filter()->unique()->all())->pluck('login', 'userpk');
+        return collect($rows)->map(fn($r) => [
+            'exportpk' => (int) $r->exportpk,
+            'contpk'   => (int) $r->contpk,
+            'idship'   => $this->idship($r->exportpk),
+            'buyer'    => implode(', ', $this->buyerList($r->buyer)),
+            'POno'     => $r->POno,
+            'eca'      => $r->contdate,
+            'nopol'    => $r->nopol,
+            'pic'      => $pics[$r->userpk] ?? null,
+            'arrived'  => !empty($r->actcontdate),
+        ])->values()->all();
+    }
+
+    private function truckQuery()
+    {
+        return DB::table('cont')->join('export', 'export.exportpk', '=', 'cont.exportpk')
+            ->whereRaw('LOWER(TRIM(cont.type)) = ?', ['lcl'])
+            ->where(fn($q) => $q->whereNull('export.stscancel')->orWhere('export.stscancel', '<>', 1))
+            ->select('cont.*', 'export.buyer', 'export.POno', 'export.contdate', 'export.userpk');
+    }
+
+    // GET /export/{exportpk}/truck?q= : SP di truk ini + SP LCL lain yang bisa disatukan
+    public function truckInfo(Request $request, $exportpk)
+    {
+        if (!LclTrip::ready()) {
+            return response()->json(['success' => false, 'message' => 'Kolom gate_trip pada table cont belum ada. Hubungi IT.'], 503);
+        }
+        $export = DB::table('export')->where('exportpk', $exportpk)->first(['exportpk', 'contdate', 'stscancel']);
+        if (!$export) {
+            return response()->json(['success' => false, 'message' => 'Shipment plan tidak ditemukan.'], 404);
+        }
+        [$cont, $err] = $this->lclCont($exportpk);
+        if ($err) {
+            return response()->json(['success' => false, 'message' => $err], 422);
+        }
+
+        $col = GateController::TRIP_COLUMN;
+        $trip = (int) $cont->{$col} > 0 ? (int) $cont->{$col} : 0;
+        $members = $trip ? $this->truckQuery()->where('cont.' . $col, $trip)->orderBy('cont.contpk')->get()
+            : $this->truckQuery()->where('cont.contpk', $cont->contpk)->get();
+        $leader = $trip ? DB::table('cont')->where('contpk', $trip)->first() : $cont;
+
+        // kandidat: SP LCL aktif, belum keluar, belum di truk lain; tanpa kata kunci = ECA +-14 hari
+        $search = trim((string) $request->input('q', ''));
+        $idShip = preg_match('/^\s*(?:SP)?0*(\d+)\s*$/i', $search, $m) ? (int) $m[1] : null;
+        $eca = $export->contdate;
+        $cands = $this->truckQuery()
+            ->whereNotIn('cont.contpk', $members->pluck('contpk')->all())
+            ->whereNull('cont.gate_out_at')
+            ->where(fn($q) => $q->whereNull('cont.' . $col)->orWhere('cont.' . $col, '<=', 0))
+            ->when($search !== '', fn($q) => $q->where(function ($w) use ($search, $idShip) {
+                if ($idShip !== null) $w->orWhere('export.exportpk', $idShip);
+                $w->orWhere('export.POno', 'like', "%{$search}%")->orWhere('export.buyer', 'like', "%{$search}%")
+                    ->orWhere('cont.nopol', 'like', "%{$search}%");
+            }))
+            ->when($search === '' && $eca, fn($q) => $q->whereBetween('export.contdate', [
+                Carbon::parse($eca)->subDays(14)->toDateString(), Carbon::parse($eca)->addDays(14)->toDateString()]))
+            ->when($eca, fn($q) => $q->orderByRaw('ABS(DATEDIFF(export.contdate, ?))', [$eca]))
+            ->orderByDesc('export.exportpk')
+            ->limit(150)
+            ->get();
+        // SP dengan lebih dari 1 container LCL tidak bisa disatukan
+        $multi = DB::table('cont')->whereIn('exportpk', $cands->pluck('exportpk')->all())->whereRaw('LOWER(TRIM(type)) = ?', ['lcl'])
+            ->selectRaw('exportpk, COUNT(*) n')->groupBy('exportpk')->having('n', '>', 1)->pluck('n', 'exportpk');
+
+        return response()->json([
+            'success'    => true,
+            'idship'     => $this->idship($exportpk),
+            'is_manager' => ShipplanAccess::isManager(),
+            'leader'     => $trip ?: null,
+            'nopol'      => $leader->nopol ?: $cont->nopol,
+            'eca'        => $eca,
+            'closed'     => LclTrip::hasGateData($leader) ? LclTrip::closedReason($leader) : null,
+            'filled'     => LclTrip::hasGateData($leader),
+            'members'    => array_map(fn($r) => $r + ['is_leader' => $trip && $r['contpk'] === $trip], $this->truckRows($members)),
+            'candidates' => array_map(function ($r) use ($cands, $multi) {
+                $c = $cands->firstWhere('contpk', $r['contpk']);
+                $r['blocked'] = isset($multi[$r['exportpk']]) ? 'Lebih dari 1 container LCL'
+                    : (LclTrip::hasGateData($c) ? 'Sudah diisi security sebagai truk lain' : null);
+                return $r;
+            }, $this->truckRows($cands)),
+        ]);
+    }
+
+    /**
+     * POST /export/truck  body: exportpk, members[] (SP lain yang disatukan), nopol, contdate (ECA)
+     * Semua SP truk diberi plat & ECA yang sama dan dikunci ke SP induk (gate_trip). Induk = truk yang sudah ada,
+     * SP yang sudah diisi security, atau contpk terkecil. Data truk yang sudah diisi security tersalin ke SP baru.
+     */
+    public function truckSave(Request $request)
+    {
+        if (!ShipplanAccess::isManager()) {
+            return response()->json(['success' => false, 'message' => 'Hanya Manager EXIM yang bisa menyatukan SP dalam satu truk.'], 403);
+        }
+        if (!LclTrip::ready()) {
+            return response()->json(['success' => false, 'message' => 'Kolom gate_trip pada table cont belum ada. Hubungi IT.'], 503);
+        }
+        $v = $request->validate([
+            'exportpk'  => 'required|integer',
+            'members'   => 'nullable|array',
+            'members.*' => 'integer',
+            'nopol'     => 'required|string|max:20',
+            'contdate'  => 'required|date',
+        ], [
+            'nopol.required'    => 'Isi plat truk.',
+            'contdate.required' => 'Isi ECA.',
+        ]);
+        $fail = fn($msg) => response()->json(['success' => false, 'message' => $msg], 422);
+        $col = GateController::TRIP_COLUMN;
+
+        $conts = collect();
+        foreach (collect([$v['exportpk']])->merge($v['members'] ?? [])->map(fn($x) => (int) $x)->unique() as $pk) {
+            $export = DB::table('export')->where('exportpk', $pk)->first(['exportpk', 'stscancel']);
+            if (!$export || (int) $export->stscancel === 1) {
+                return $fail($this->idship($pk) . ' tidak ditemukan / sudah dibatalkan.');
+            }
+            [$cont, $err] = $this->lclCont($pk);
+            if ($err) {
+                return $fail($err);
+            }
+            $conts->push($cont);
+        }
+
+        // induk: truk yang sudah ada (maks. satu), SP yang sudah diisi security (maks. satu), atau contpk terkecil
+        $trips = $conts->map(fn($c) => (int) $c->{$col})->filter(fn($t) => $t > 0)->unique()->values();
+        if ($trips->count() > 1) {
+            return $fail('SP yang dipilih berasal dari truk berbeda. Lepas dulu SP dari truk lamanya.');
+        }
+        $leaderPk = (int) $trips->first();
+        if (!$leaderPk) {
+            if ($conts->count() < 2) {
+                return $fail('Pilih minimal 1 SP lain untuk disatukan dalam truk ini.');
+            }
+            $filled = $conts->filter(fn($c) => LclTrip::hasGateData($c));
+            if ($filled->count() > 1) {
+                return $fail($filled->map(fn($c) => $this->idship($c->exportpk))->implode(', ') . ' sudah diisi security sebagai truk berbeda.');
+            }
+            $leaderPk = (int) ($filled->isNotEmpty() ? $filled->first()->contpk : $conts->min('contpk'));
+        }
+        $leader = DB::table('cont')->where('contpk', $leaderPk)->first();
+
+        $newcomers = $conts->filter(fn($c) => (int) $c->contpk !== $leaderPk && (int) $c->{$col} !== $leaderPk);
+        foreach ($newcomers as $c) {
+            if (LclTrip::hasGateData($c)) {
+                return $fail($this->idship($c->exportpk) . ' sudah diisi security sebagai truk lain, tidak bisa disatukan.');
+            }
+        }
+        if ($newcomers->isNotEmpty() && LclTrip::hasGateData($leader) && ($why = LclTrip::closedReason($leader))) {
+            return $fail('SP tidak bisa ditambahkan ke truk ini: ' . $why);
+        }
+
+        $nopol = Str::upper(preg_replace('/\s+/', ' ', trim($v['nopol'])));
+        $eca = Carbon::parse($v['contdate'])->toDateString();
+        $allPks = DB::table('cont')->where($col, $leaderPk)->pluck('contpk')->merge($conts->pluck('contpk'))->map(fn($x) => (int) $x)->unique()->values();
+
+        DB::transaction(function () use ($allPks, $leaderPk, $col, $nopol, $eca) {
+            DB::table('cont')->whereIn('contpk', $allPks)->update([$col => $leaderPk, 'nopol' => $nopol]);
+            $exportpks = DB::table('cont')->whereIn('contpk', $allPks)->pluck('exportpk')->unique()->all();
+            DB::table('export')->whereIn('exportpk', $exportpks)->update(['contdate' => $eca, 'dateupdt' => now()]);
+            // truk yang sudah diisi security: jam tiba, foto, checklist, dst. ikut tersalin ke SP baru
+            LclTrip::sync($leaderPk);
+        });
+
+        $ids = DB::table('cont')->whereIn('contpk', $allPks)->orderBy('contpk')->pluck('exportpk')->map(fn($x) => $this->idship($x))->implode(', ');
+        return response()->json([
+            'success' => true,
+            'message' => "{$ids} sekarang satu truk ({$nopol}, ECA " . Carbon::parse($eca)->format('d/m/Y') . ').',
+        ]);
+    }
+
+    // POST /export/truck/release  body: exportpk -- lepas SP dari truknya; data truk yang tersalin dikosongkan
+    public function truckRelease(Request $request)
+    {
+        if (!ShipplanAccess::isManager()) {
+            return response()->json(['success' => false, 'message' => 'Hanya Manager EXIM yang bisa melepas SP dari truk.'], 403);
+        }
+        if (!LclTrip::ready()) {
+            return response()->json(['success' => false, 'message' => 'Kolom gate_trip pada table cont belum ada. Hubungi IT.'], 503);
+        }
+        $v = $request->validate(['exportpk' => 'required|integer']);
+        $fail = fn($msg) => response()->json(['success' => false, 'message' => $msg], 422);
+        $col = GateController::TRIP_COLUMN;
+
+        [$cont, $err] = $this->lclCont($v['exportpk']);
+        if ($err) {
+            return $fail($err);
+        }
+        $trip = (int) $cont->{$col};
+        if ($trip <= 0) {
+            return $fail($this->idship($cont->exportpk) . ' tidak tergabung di truk mana pun.');
+        }
+        $rows = DB::table('cont')->where($col, $trip)->get();
+        $leader = $rows->firstWhere('contpk', $trip);
+        if ($leader && !empty($leader->gate_out_at)) {
+            return $fail('Truk sudah keluar MIF, SP tidak bisa dilepas.');
+        }
+        $others = $rows->where('contpk', '<>', $cont->contpk)->values();
+        $isLeader = (int) $cont->contpk === $trip;
+        if ($isLeader && $others->isNotEmpty() && LclTrip::hasGateData($cont)) {
+            return $fail('SP induk menyimpan data & foto truk dari security, tidak bisa dilepas. Lepas SP lain di truk ini.');
+        }
+
+        DB::transaction(function () use ($cont, $others, $isLeader, $col, $leader) {
+            if ($isLeader) {
+                // induk belum diisi security: SP terkecil berikutnya jadi induk (truk tinggal 1 SP -> bukan truk bersama)
+                if ($others->isNotEmpty()) {
+                    $newLeader = (int) $others->min('contpk');
+                    DB::table('cont')->whereIn('contpk', $others->pluck('contpk'))->update([$col => $others->count() > 1 ? $newLeader : null]);
+                }
+                DB::table('cont')->where('contpk', $cont->contpk)->update([$col => null]);
+            } else {
+                $reset = array_fill_keys(LclTrip::truckColumns(), null) + ['gate_transporter' => null, $col => null];
+                DB::table('cont')->where('contpk', $cont->contpk)->update($reset);
+                if ($others->count() === 1 && $leader) {
+                    DB::table('cont')->where('contpk', $leader->contpk)->update([$col => null]);
+                }
+            }
+        });
+
+        return response()->json(['success' => true, 'message' => $this->idship($cont->exportpk) . ' dilepas dari truk.']);
     }
 
     // export.popks dipakai available_cartons() sebagai daftar popk yang

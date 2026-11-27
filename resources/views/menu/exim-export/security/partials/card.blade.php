@@ -53,9 +53,6 @@
         <dt>Forwarder</dt><dd>{{ $join('fwdnm') ?: '-' }}</dd>
         <dt>Ekspedisi</dt><dd>{{ $join('ekspedisinm') ?: '-' }}</dd>
         <dt>PIC EXIM</dt><dd>{{ $join('pic') ?: '-' }}</dd>
-        @if ($c->pending->isNotEmpty() && !$c->departed_at)
-            <dt>SP baru</dt><dd class="sg-card__pending">{{ $c->pending->pluck('idship')->implode(', ') }} · belum digabung</dd>
-        @endif
         @if ($c->is_lcl)
             @if ($c->contno_fmt)
                 <dt>No. container</dt><dd class="sg-mono">{{ $c->contno_fmt }}</dd>

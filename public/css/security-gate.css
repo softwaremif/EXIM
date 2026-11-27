@@ -380,8 +380,6 @@ a.sg-step__label { color: inherit; text-decoration: none; }
 /* tambah petugas: scan ID card / cari nama (satu dialog) */
 .sg-people__add { border-style: dashed; }
 .sg-field.is-error .sg-people__add { border: 2px solid var(--danger); }
-/* karyawan harian lepas diberi garis kiri */
-.sg-people__item.is-hl { box-shadow: inset 3px 0 0 var(--info); }
 .sg-people__view { margin: 0; padding-left: 20px; }
 .sg-people__view li + li { margin-top: var(--space-1); }
 
@@ -701,5 +699,4 @@ a.sg-step__label { color: inherit; text-decoration: none; }
 .sg-trip__po { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sg-trip__count { font-weight: 400; color: var(--ink-muted); }
 .sg-trip__tag { flex: none; padding: 2px var(--space-2); border-radius: var(--radius-pill); background: var(--info-soft); color: var(--info); font: 600 12px/16px var(--font-sans); }
-.sg-card__pending { color: var(--warn); }
 .sg-chips--wrap { flex-wrap: wrap; overflow: visible; }

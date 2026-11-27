@@ -3716,6 +3716,8 @@
                 $('#menu_add_pono').toggleClass('d-none', isCancelled || isSegel == 1 || isLeave == 1);
                 // gabung shipment: tujuan harus aktif, belum Lock Shipment / Complete / keluar pabrik
                 $('#menu_merge').toggleClass('d-none', isCancelled || isSegel == 1 || isLeave == 1 || lockship == 1);
+                // satu truk LCL: shipment aktif yang containernya belum keluar pabrik
+                $('#menu_truck').toggleClass('d-none', isCancelled || isLeave == 1);
                 $('#cancelled').toggleClass('d-none', !isCancelled);
                 // shipment hasil gabung: "Digabung ke SPxxxx" (bukan "Cancelled")
                 $('#cancelled').html(mergedTo
@@ -3835,6 +3837,9 @@
                         break;
                     case 'merge':
                         mergeShipment(exportpk, buyer);
+                        break;
+                    case 'truck':
+                        openTruckModal(exportpk);
                         break;
                     case 'set_complete':
                         setCompleteShipment(exportpk);
@@ -5923,6 +5928,7 @@
 
                         $('#ordnop').text(data.OP ? 'ORDER NUMBER : ' + data.OP : 'No Order Number');
                         $('#buyerp').text(data.buyer ? 'BUYER : ' + data.buyer : 'No Buyer Information');
+                        $('#truckp').text(data.truck ? 'SATU TRUK : ' + data.truck : '');
                         $('#POnop').text(data.POno ? 'PO : ' + String(data.POno).split(',').map(s => s.trim())
                             .filter(Boolean).join(', ') : 'No PO Number');
 
@@ -7317,6 +7323,300 @@
             };
         })();
 
+        // ---------- Satu truk (LCL): beberapa SP LCL dalam satu truk, khusus Manager EXIM ----------
+        // Plat & ECA disamakan, SP dikunci ke SP induk (cont.gate_trip). Security Gate mengisi data truk sekali,
+        // otomatis tersalin ke semua SP. Diproses ShipplanController::truckInfo / truckSave / truckRelease.
+        (function() {
+            let trkExportpk = null;
+            let trkCands = [];
+            let trkData = null;
+            const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+            const fmtDate = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : '-';
+            const stateRow = (html, cls = '') => `<tr class="trk-state"><td colspan="5" class="${cls}">${html}</td></tr>`;
+            const csrf = () => document.querySelector('meta[name="csrf-token"]').content;
+
+            function ensureModal() {
+                if (document.getElementById('modalTruck')) return;
+                document.body.insertAdjacentHTML('beforeend', `
+                    <style>
+                        #modalTruck .modal-content { border: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 48px rgba(16,24,40,.18); }
+                        #modalTruck .trk-header { display: flex; align-items: flex-start; gap: 14px; padding: 18px 22px 14px; border-bottom: 1px solid #EAECF0; }
+                        #modalTruck .trk-icon { width: 42px; height: 42px; border-radius: 12px; background: #EAF2FF; color: #2F6FED; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+                        #modalTruck .trk-title { margin: 0; font-size: 1.05rem; font-weight: 700; color: #101828; }
+                        #modalTruck .trk-sub { margin: 2px 0 0; font-size: .8rem; color: #667085; }
+                        #modalTruck .trk-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; font-size: .74rem; font-weight: 600; background: #EAF2FF; color: #2F6FED; }
+                        #modalTruck .trk-form { display: flex; gap: 12px; padding: 14px 22px 0; flex-wrap: wrap; }
+                        #modalTruck .trk-form label { display: block; font-size: .72rem; font-weight: 700; color: #667085; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+                        #modalTruck .trk-form input { padding: 7px 12px; border: 1px solid #D0D5DD; border-radius: 10px; font-size: .88rem; outline: none; }
+                        #modalTruck .trk-form input:focus { border-color: #84ADFF; box-shadow: 0 0 0 3px rgba(47,111,237,.12); }
+                        #modalTruck .trk-form #trkNopol { width: 180px; text-transform: uppercase; font-family: monospace; }
+                        #modalTruck .trk-note { margin: 12px 22px 0; padding: 10px 12px; border-radius: 10px; background: #F8F9FC; color: #475467; font-size: .8rem; }
+                        #modalTruck .trk-warn { background: #FEF3F2; color: #B42318; }
+                        #modalTruck .trk-label { margin: 14px 22px 6px; font-size: .72rem; font-weight: 700; color: #667085; text-transform: uppercase; letter-spacing: .04em; }
+                        #modalTruck .trk-members { margin: 0 22px; display: flex; flex-direction: column; gap: 6px; }
+                        #modalTruck .trk-member { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #EAECF0; border-radius: 10px; font-size: .84rem; }
+                        #modalTruck .trk-member .trk-grow { flex: 1; min-width: 0; }
+                        #modalTruck .trk-id { font-weight: 700; color: #101828; }
+                        #modalTruck .trk-small { font-size: .75rem; color: #667085; }
+                        #modalTruck .trk-po { max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                        #modalTruck .trk-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .7rem; font-weight: 600; background: #EAF2FF; color: #2F6FED; }
+                        #modalTruck .trk-tag-warn { background: #FEF3F2; color: #B42318; }
+                        #modalTruck .trk-toolbar { display: flex; align-items: center; gap: 10px; padding: 0 22px 10px; }
+                        #modalTruck .trk-search { position: relative; flex: 1; }
+                        #modalTruck .trk-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #98A2B3; }
+                        #modalTruck .trk-search input { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid #D0D5DD; border-radius: 10px; font-size: .85rem; outline: none; }
+                        #modalTruck .trk-body { max-height: 38vh; overflow: auto; border-top: 1px solid #EAECF0; }
+                        #modalTruck table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .84rem; }
+                        #modalTruck thead th { position: sticky; top: 0; z-index: 1; background: #F8F9FC; color: #667085; font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 9px 12px; border-bottom: 1px solid #EAECF0; white-space: nowrap; }
+                        #modalTruck tbody td { padding: 9px 12px; border-bottom: 1px solid #F2F4F7; vertical-align: top; }
+                        #modalTruck tr.trk-row { cursor: pointer; }
+                        #modalTruck tr.trk-row:hover td { background: #F9FAFB; }
+                        #modalTruck tr.trk-row.is-checked td { background: #EAF2FF; }
+                        #modalTruck tr.trk-row.is-blocked { cursor: not-allowed; }
+                        #modalTruck tr.trk-row.is-blocked td { color: #98A2B3; background: #FCFCFD; }
+                        #modalTruck .trk-state td { text-align: center; color: #667085; padding: 24px 12px; }
+                        #modalTruck .trk-footer { display: flex; align-items: center; gap: 8px; padding: 12px 22px; border-top: 1px solid #EAECF0; background: #FCFCFD; }
+                        #modalTruck .trk-count { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; background: #EAF2FF; color: #2F6FED; font-size: .78rem; font-weight: 700; }
+                    </style>
+                    <div class="modal fade" id="modalTruck" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                        <div class="trk-header">
+                            <div class="trk-icon"><i class="bi bi-truck"></i></div>
+                            <div class="flex-fill">
+                                <h5 class="trk-title">Satu truk (LCL)</h5>
+                                <p class="trk-sub">Beberapa shipment plan LCL diangkut satu truk. Security mengisi data truk sekali, otomatis tersimpan di semua SP.
+                                    <span class="trk-chip"><i class="bi bi-hash"></i><span id="trkIdship">-</span></span></p>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="trk-form">
+                            <div><label for="trkNopol">Plat truk</label><input type="text" id="trkNopol" maxlength="20" placeholder="B 1234 XX" autocomplete="off"></div>
+                            <div><label for="trkEca">ECA</label><input type="date" id="trkEca"></div>
+                        </div>
+                        <div class="trk-note" id="trkNote"><i class="bi bi-info-circle me-1"></i>
+                            Plat &amp; ECA semua SP di truk ini akan disamakan. SP yang sudah diisi security sebagai truk lain, atau truk yang sudah dipasang seal / ditolak / keluar, tidak bisa ditambah.
+                        </div>
+                        <div id="trkError" class="alert alert-danger py-2 mx-4 mt-3 mb-0 d-none"></div>
+                        <div class="trk-label">SP di truk ini</div>
+                        <div class="trk-members" id="trkMembers"></div>
+                        <div class="trk-label">Tambah SP LCL lain <span class="trk-small" id="trkTotal"></span></div>
+                        <div class="trk-toolbar">
+                            <div class="trk-search">
+                                <i class="bi bi-search"></i>
+                                <input type="text" id="trkSearch" placeholder="Cari ID shipment (SP0012), PO, buyer, plat... (tanpa kata kunci: ECA ±14 hari)">
+                            </div>
+                        </div>
+                        <div class="trk-body">
+                            <table>
+                            <thead><tr>
+                                <th style="width:44px"></th>
+                                <th>Shipment</th>
+                                <th>Buyer / PIC</th>
+                                <th>PO Number</th>
+                                <th>ECA · Plat</th>
+                            </tr></thead>
+                            <tbody id="trkBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="trk-footer">
+                            <span class="trk-count"><i class="bi bi-check2-square"></i> <span id="trkCount">0</span> SP ditambah</span>
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                            <button type="button" class="btn btn-primary" id="btnTruckSave">
+                                <span class="spinner-border spinner-border-sm d-none me-1" id="trkSpin"></span>Simpan
+                            </button>
+                        </div>
+                        </div>
+                    </div>
+                    </div>`);
+
+                let t;
+                document.getElementById('trkSearch').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => load(false), 300); });
+                const body = document.getElementById('trkBody');
+                body.addEventListener('change', updateCount);
+                body.addEventListener('click', e => {
+                    const tr = e.target.closest('tr.trk-row');
+                    if (!tr || e.target.closest('input')) return;
+                    const chk = tr.querySelector('.trk-chk');
+                    if (chk.disabled) return;
+                    chk.checked = !chk.checked;
+                    updateCount();
+                });
+                document.getElementById('trkMembers').addEventListener('click', e => {
+                    const btn = e.target.closest('[data-release]');
+                    if (btn) release(Number(btn.dataset.release), btn.dataset.label, btn);
+                });
+                document.getElementById('btnTruckSave').addEventListener('click', save);
+            }
+
+            const selected = () => Array.from(document.querySelectorAll('#trkBody .trk-chk:checked')).map(c => trkCands[c.dataset.i]);
+
+            function updateCount() {
+                document.querySelectorAll('#trkBody .trk-chk').forEach(c => c.closest('tr').classList.toggle('is-checked', c.checked));
+                document.getElementById('trkCount').textContent = selected().length;
+            }
+
+            function showError(msg) {
+                const err = document.getElementById('trkError');
+                err.textContent = msg || '';
+                err.classList.toggle('d-none', !msg);
+            }
+
+            function renderMembers() {
+                const d = trkData;
+                const inTruck = d.members.length > 1;
+                document.getElementById('trkMembers').innerHTML = d.members.map(m => `
+                    <div class="trk-member">
+                        <div class="trk-grow">
+                            <span class="trk-id">${esc(m.idship)}</span>
+                            ${m.is_leader ? '<span class="trk-tag">Induk</span>' : ''}
+                            ${m.arrived ? '<span class="trk-tag">Sudah tiba</span>' : ''}
+                            <div class="trk-small">${esc(m.buyer || '-')} · PIC ${esc(m.pic || '-')}</div>
+                            <div class="trk-small trk-po" title="${esc(m.POno)}">PO ${esc(m.POno || '-')}</div>
+                        </div>
+                        ${inTruck ? `<button type="button" class="btn btn-sm btn-outline-danger" data-release="${m.exportpk}" data-label="${esc(m.idship)}"><i class="bi bi-box-arrow-right me-1"></i>Lepas</button>` : ''}
+                    </div>`).join('') + (inTruck ? '' : '<div class="trk-small">Belum satu truk dengan SP lain. Pilih SP di bawah lalu Simpan.</div>');
+                const note = document.getElementById('trkNote');
+                if (d.closed) {
+                    note.className = 'trk-note trk-warn';
+                    note.innerHTML = `<i class="bi bi-slash-circle me-1"></i>${esc(d.closed)} SP lain tidak bisa ditambahkan ke truk ini.`;
+                }
+            }
+
+            async function load(full) {
+                const body = document.getElementById('trkBody');
+                const keep = new Set(selected().map(r => r.exportpk));
+                body.innerHTML = stateRow('<span class="spinner-border spinner-border-sm me-2"></span>Memuat...');
+                const q = encodeURIComponent(document.getElementById('trkSearch').value.trim());
+                try {
+                    const url = '{{ route('export.truck', ['exportpk' => '__ID__']) }}'.replace('__ID__', trkExportpk) + '?q=' + q;
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    const json = await res.json().catch(() => ({}));
+                    if (!res.ok || json.success === false) {
+                        body.innerHTML = stateRow(esc(json.message || 'Gagal memuat data.'), 'text-danger');
+                        if (full) document.getElementById('trkMembers').innerHTML = '';
+                        document.getElementById('btnTruckSave').disabled = true;
+                        return;
+                    }
+                    trkData = json;
+                    if (full) {
+                        document.getElementById('trkIdship').textContent = json.idship;
+                        document.getElementById('trkNopol').value = json.nopol || '';
+                        document.getElementById('trkEca').value = json.eca ? String(json.eca).slice(0, 10) : '';
+                    }
+                    renderMembers();
+                    document.getElementById('btnTruckSave').disabled = false;
+                    trkCands = json.candidates || [];
+                    document.getElementById('trkTotal').textContent = '· ' + trkCands.length + ' SP';
+                    if (!trkCands.length) {
+                        body.innerHTML = stateRow('<i class="bi bi-inbox me-1"></i> Tidak ada SP LCL lain yang cocok. Cari dengan ID shipment / PO / buyer.');
+                        updateCount();
+                        return;
+                    }
+                    const closed = !!json.closed;
+                    body.innerHTML = trkCands.map((r, i) => {
+                        const blocked = r.blocked || (closed ? 'Truk ini tidak bisa ditambah SP' : '');
+                        return `
+                        <tr class="trk-row ${blocked ? 'is-blocked' : ''}" ${blocked ? `title="${esc(blocked)}"` : ''}>
+                            <td class="text-center"><input type="checkbox" class="form-check-input trk-chk" data-i="${i}" ${blocked ? 'disabled' : ''} ${!blocked && keep.has(r.exportpk) ? 'checked' : ''}></td>
+                            <td><div class="trk-id">${esc(r.idship)}</div>${blocked ? `<span class="trk-tag trk-tag-warn"><i class="bi bi-slash-circle"></i> ${esc(blocked)}</span>` : ''}</td>
+                            <td>${esc(r.buyer || '-')}<div class="trk-small">PIC ${esc(r.pic || '-')}</div></td>
+                            <td><div class="trk-po" title="${esc(r.POno)}">${esc(r.POno || '-')}</div></td>
+                            <td>${esc(fmtDate(r.eca))}<div class="trk-small">${esc(r.nopol || 'plat belum diisi')}</div></td>
+                        </tr>`;
+                    }).join('');
+                    updateCount();
+                } catch (e) {
+                    body.innerHTML = stateRow('Terjadi kesalahan jaringan.', 'text-danger');
+                }
+            }
+
+            async function post(url, payload) {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+                    body: JSON.stringify(payload),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok || json.success === false) {
+                    throw new Error(json.message || (json.errors ? Object.values(json.errors).flat().join(' ') : 'Gagal menyimpan.'));
+                }
+                return json;
+            }
+
+            async function save() {
+                const rows = selected();
+                const nopol = document.getElementById('trkNopol').value.trim();
+                const eca = document.getElementById('trkEca').value;
+                showError('');
+                if (!nopol || !eca) return showError('Isi plat truk dan ECA.');
+                if (!rows.length && trkData.members.length < 2) return showError('Pilih minimal 1 SP lain untuk disatukan dalam truk ini.');
+                const all = trkData.members.map(m => m.idship).concat(rows.map(r => r.idship));
+                const ok = await appConfirm(
+                    `${all.join(', ')} akan menjadi satu truk.\n\n`
+                    + `• Plat semua SP: ${nopol.toUpperCase()}\n`
+                    + `• ECA semua SP: ${fmtDate(eca)}\n`
+                    + (trkData.filled && rows.length ? `• Data truk yang sudah diisi security (jam tiba, foto, checklist) ikut tersalin ke SP baru\n` : '')
+                    + `\nLanjutkan?`, { type: 'question', title: 'Simpan satu truk?', okText: 'Ya, simpan' });
+                if (!ok) return;
+                const btn = document.getElementById('btnTruckSave');
+                const spin = document.getElementById('trkSpin');
+                btn.disabled = true;
+                spin.classList.remove('d-none');
+                try {
+                    const json = await post('{{ route('export.truck.save') }}', {
+                        exportpk: trkExportpk, members: rows.map(r => r.exportpk), nopol: nopol, contdate: eca,
+                    });
+                    bootstrap.Modal.getInstance(document.getElementById('modalTruck')).hide();
+                    showToast(json.message, 'success');
+                    reloadSpGrid();
+                } catch (e) {
+                    showError(e.message);
+                } finally {
+                    btn.disabled = false;
+                    spin.classList.add('d-none');
+                }
+            }
+
+            async function release(exportpk, label, btn) {
+                showError('');
+                const ok = await appConfirm(`Lepas ${label} dari truk ini?\n\nData truk yang tersalin ke ${label} (jam tiba, foto, checklist, dst.) dikosongkan, dan ${label} kembali menjadi truk sendiri.`,
+                    { type: 'warning', title: 'Lepas dari truk?', okText: 'Ya, lepas' });
+                if (!ok) return;
+                btn.disabled = true;
+                try {
+                    const json = await post('{{ route('export.truck.release') }}', { exportpk: exportpk });
+                    showToast(json.message, 'success');
+                    reloadSpGrid();
+                    // SP yang sedang dibuka dilepas: modal tetap untuk SP ini (sekarang truk sendiri)
+                    await load(true);
+                } catch (e) {
+                    btn.disabled = false;
+                    showError(e.message);
+                }
+            }
+
+            // panggil dari menu row: openTruckModal(exportpk)
+            window.openTruckModal = function(exportpk) {
+                ensureModal();
+                trkExportpk = exportpk;
+                trkCands = [];
+                trkData = { members: [] };
+                document.getElementById('trkIdship').textContent = 'SP' + String(exportpk).padStart(4, '0');
+                document.getElementById('trkSearch').value = '';
+                document.getElementById('trkMembers').innerHTML = '';
+                document.getElementById('trkBody').innerHTML = '';
+                const note = document.getElementById('trkNote');
+                note.className = 'trk-note';
+                note.innerHTML = '<i class="bi bi-info-circle me-1"></i>Plat &amp; ECA semua SP di truk ini akan disamakan. SP yang sudah diisi security sebagai truk lain, atau truk yang sudah dipasang seal / ditolak / keluar, tidak bisa ditambah.';
+                showError('');
+                updateCount();
+                const el = document.getElementById('modalTruck');
+                (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
+                load(true);
+            };
+        })();
+
         // ---------- modal Edit Shipment Plan: sinkron buyer dari data MD (po.buyer semua PO di SP) ----------
         (function() {
             const notify = (msg, type) => typeof showToast === 'function' ? showToast(msg, type) : appAlert(msg, { type });
@@ -7588,6 +7888,12 @@
                     <button type="button" id="menu_merge" class="sp-action-item" onclick="onActionClick('merge')">
                         <i class="bi bi-intersect"></i> Gabung Shipment
                     </button>
+                    {{-- beberapa SP LCL dalam satu truk (security isi data truk sekali); khusus Manager EXIM --}}
+                    @if (\App\Services\ShipplanAccess::isManager())
+                        <button type="button" id="menu_truck" class="sp-action-item" onclick="onActionClick('truck')">
+                            <i class="bi bi-truck"></i> Satu truk (LCL)
+                        </button>
+                    @endif
                     {{-- muncul kalau stuffing 100% (toggleActionMenu); carton -> status 7, PO selesai -> po.sts 1 --}}
                     <button type="button" id="menu_set_complete" class="sp-action-item d-none" onclick="onActionClick('set_complete')">
                         <i class="bi bi-check2-circle"></i> Set Complete Shipment
