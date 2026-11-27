@@ -3657,34 +3657,12 @@
                 refreshPaneWidgets(key);
             }
 
-            // .mc-pane itu display:none selama tidak aktif, dan easyui merender widget yang
-            // diinisialisasi di dalam elemen tersembunyi dengan lebar 0 — kotaknya kelihatan
-            // tapi tombol kalendernya tidak bisa diklik. Jadi datetimebox-nya sengaja BARU
-            // diinisialisasi saat panenya benar-benar tampil.
-            function initArrivalDatetimebox(input) {
-                try {
-                    if ($(input).data('datetimebox')) {
-                        $(input).datetimebox('resize', 250);
-                        return;
-                    }
-
-                    $(input).datetimebox({
-                        formatter: myformatter2,
-                        parser: myparser2,
-                        width: 250,
-                        height: 40,
-                    });
-
-                    // nilai awal dititipkan di dataset oleh syncContainerArrivalTab(),
-                    // karena saat itu widget-nya memang belum ada
-                    const preset = input.dataset.presetValue || '';
-                    if (preset) {
-                        $(input).datetimebox('setValue', preset);
-                    }
-                    // jam tiba bisa diisi / diedit EXIM (juga diisi security saat gate in)
-                } catch (err) {
-                    console.error('[shipplan] init datetimebox actcontdate gagal:', err);
-                }
+            // jam tiba container (cont.actcontdate) hanya teks informasi dari Security Gate,
+            // nilai dititipkan di dataset oleh syncContainerArrivalTab() (format dd/mm/yyyy HH:mm)
+            function initArrivalDatetimebox(el) {
+                const val = el.dataset.presetValue || '';
+                el.textContent = val || 'Belum dicatat security';
+                el.classList.toggle('is-empty', !val);
             }
 
             function refreshPaneWidgets(paneKey) {
@@ -3856,19 +3834,13 @@
                     // elemennya sudah ada di DOM untuk menghitung lebar & menempelkan panelnya
                     arrivalList.appendChild(arrivalEl);
 
-                    // Actual Container Arrival (easyui-datetimebox).
-                    // isi <template> tidak pernah ikut di-parse easyui saat DOM ready, jadi kartu
-                    // hasil clone harus diinisialisasi manual — tapi BUKAN di sini, karena pane
-                    // "info" masih display:none. initArrivalDatetimebox() yang mengerjakannya
-                    // lewat refreshPaneWidgets() begitu panenya tampil.
+                    // Actual Container Arrival: hanya teks jam tiba dari Security Gate (tidak ikut ter-submit)
                     const actInput = arrivalEl.querySelector('[data-field="actcontdate"]');
 
                     if (actInput) {
-                        // name harus dipasang SEBELUM init: easyui memindahkan atribut name
-                        // ke hidden input .textbox-value miliknya, dan itulah yang ikut ter-submit
-                        actInput.name = `containers[${i}][actcontdate]`;
                         actInput.dataset.presetValue = saved.actcontdate ||
                             sourceItem.dataset.actcontdate || '';
+                        initArrivalDatetimebox(actInput);
                     }
 
                     // kartu tab foto TIDAK dibangun di sini — syncContainerFotoTab() pemilik

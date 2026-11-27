@@ -1066,8 +1066,7 @@ class ShipplanController extends Controller
             DB::commit();
 
             return response()->json([
-                'message'         => 'Data export berhasil diperbarui dan ' . $totalContainer . ' container berhasil disimpan.'
-                    . ($this->arrivalKept ? ' Jam tiba ' . implode(', ', $this->arrivalKept) . ' tidak dikosongkan karena sudah dicatat security (gate in).' : ''),
+                'message'         => 'Data export berhasil diperbarui dan ' . $totalContainer . ' container berhasil disimpan.',
                 'total_container' => $totalContainer,
             ]);
         } catch (ValidationException $e) {
@@ -1188,20 +1187,6 @@ class ShipplanController extends Controller
         return false;
     }
 
-    // container yang jam tibanya diminta dikosongkan tapi sudah dicatat security (untuk pesan simpan)
-    private $arrivalKept = [];
-
-    // sudah dicatat gate in (atau keluar) oleh Security Gate: jam tiba milik data security
-    private function hasSecurityGateIn(int $contpk): bool
-    {
-        $cols = array_intersect(['gate_userpk', 'gate_out_at', 'gate_result'], Schema::getColumnListing('cont'));
-        if (!$cols) {
-            return false;
-        }
-        $row = DB::table('cont')->where('contpk', $contpk)->first($cols);
-        return $row && collect($cols)->contains(fn($col) => $row->{$col} !== null);
-    }
-
     private function storeContainers(array $data, Request $request): int
     {
         // Entri tanpa contpk & tanpa field card sama sekali (mis. hanya berisi
@@ -1246,10 +1231,8 @@ class ShipplanController extends Controller
                 $cbm = isset($c['volume']) && $c['volume'] !== '' ? (float) $c['volume'] : null;
             }
 
-            // nama field dari form adalah containers[i][actcontdate]
-            $actcontdate = !empty($c['actcontdate'])
-                ? Carbon::createFromFormat('d/m/Y H:i', $c['actcontdate'])->format('Y-m-d H:i')
-                : null;
+            // jam tiba (actcontdate) TIDAK diisi dari modal EXIM: hanya dicatat Security Gate saat gate in
+            // (GateController::store); di modal tampil sebagai informasi saja.
 
             $payload = [
                 'exportpk'      => $data['exportpk'],
@@ -1257,7 +1240,6 @@ class ShipplanController extends Controller
                 // no. truck diisi EXIM (security hanya melihat): huruf kapital, spasi tunggal
                 'nopol'         => isset($c['nopol']) && trim($c['nopol']) !== '' ? strtoupper(preg_replace('/\s+/', ' ', trim($c['nopol']))) : null,
                 'noseal'        => $c['noseal'] ?? null,
-                'actcontdate'   => $actcontdate,
                 'fwdpk'         => $c['fwd'] ?? $data['fwd'] ?? null,
 
                 'vessname'      => $c['vessname'] ?? null,
@@ -1272,25 +1254,6 @@ class ShipplanController extends Controller
             if (!empty($type)) {
                 $payload['type']   = $type;
                 $payload['volume'] = $cbm;
-            }
-
-            // jam tiba bisa diisi / diedit / dikosongkan EXIM di modal. Container yang sudah dicatat gate in /
-            // keluar oleh security tidak bisa dikosongkan (data pemeriksaan security kehilangan acuan) -> tetap.
-            if (!empty($c['contpk']) && empty($payload['actcontdate'])) {
-                if (!array_key_exists('actcontdate', $c) || $this->hasSecurityGateIn((int) $c['contpk'])) {
-                    if (array_key_exists('actcontdate', $c)) {
-                        $this->arrivalKept[] = $c['contno'] ?? ('#' . $c['contpk']);
-                    }
-                    unset($payload['actcontdate']);
-                } else {
-                    $payload['actcontdate'] = null;
-                }
-            } elseif (!empty($c['contpk']) && !empty($payload['actcontdate'])) {
-                // tidak diubah (modal hanya sampai menit): jangan tulis ulang supaya detik dari security tetap
-                $old = DB::table('cont')->where('contpk', (int) $c['contpk'])->value('actcontdate');
-                if ($old && Carbon::parse($old)->format('Y-m-d H:i') === $payload['actcontdate']) {
-                    unset($payload['actcontdate']);
-                }
             }
 
             // ================= HANDLE UPLOAD FOTO (5 SLOT) =================

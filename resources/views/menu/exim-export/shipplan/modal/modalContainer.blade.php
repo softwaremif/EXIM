@@ -60,6 +60,8 @@
                 #modalCreateContainer .gate-video { display: block; width: 157px; height: 88px; border-radius: 8px; background: #000; object-fit: cover; }
                 #modalCreateContainer .gate-media-group--video .gate-video:fullscreen { object-fit: contain; }
                 #modalCreateContainer .gate-empty { font-size: 13px; color: #8a94a3; }
+                #modalCreateContainer .mc-arrival-text { padding: 6px 0; font-size: .95rem; font-weight: 600; color: #101828; }
+                #modalCreateContainer .mc-arrival-text.is-empty { font-weight: 400; color: #98A2B3; font-style: italic; }
                 #modalCreateContainer .mc-sync-buyer { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; padding: 1px 8px; border: 1px solid #c9d6f2; border-radius: 999px; background: #fff; color: #2F6FED; font-size: 12px; font-weight: 600; line-height: 18px; cursor: pointer; }
                 #modalCreateContainer .mc-sync-buyer:hover { background: #EAF2FF; }
                 #modalCreateContainer .mc-sync-buyer:disabled { opacity: .6; cursor: wait; }
@@ -364,12 +366,10 @@
         <div class="row g-3">
             <div class="col-md-6">
                 <label class="mc-label"><i class="bi bi-calendar-event"></i> Actual Container Arrival in Fty</label>
-                {{-- isi <template> tidak pernah ikut di-parse easyui saat DOM ready.
-                    widget-nya diinisialisasi manual di syncContainerArrivalTab() setelah kartu di-append.
-                    bisa diisi / diedit EXIM; juga diisi security saat gate in. Dikosongkan = jam tiba lama tetap. --}}
-                    <input class="easyui-datetimebox mc-input" style="width:250px;height:40px;" data-field="actcontdate"
-                        data-options="formatter:myformatter2,parser:myparser2">
-                <div class="form-text">Diisi EXIM atau otomatis oleh security saat gate in. Format dd/mm/yyyy HH:mm.</div>
+                {{-- hanya teks informasi: jam tiba dicatat Security Gate saat gate in (cont.actcontdate), tidak bisa
+                    diubah EXIM dan tidak ikut terkirim saat simpan. Teks diisi initArrivalDatetimebox(). --}}
+                <div class="mc-arrival-text" data-field="actcontdate">Belum dicatat security</div>
+                <div class="form-text">Diisi otomatis oleh Security Gate saat gate in (tidak bisa diubah di EXIM).</div>
             </div>
             <div class="col-md-6">
                 <label class="mc-label"><i class="bi bi-upc-scan"></i> No. Container</label>
