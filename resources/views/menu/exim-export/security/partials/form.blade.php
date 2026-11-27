@@ -75,7 +75,7 @@
                 <dt>Buyer</dt><dd>{{ $s->buyer ?: '-' }}</dd>
                 <dt>Forwarder</dt><dd>{{ $s->fwdnm ?: '-' }}</dd>
                 <dt>Ekspedisi</dt><dd>{{ ($s->ekspedisinm ?? null) ?: '-' }}</dd>
-                <dt>No. seal</dt><dd class="sg-mono">{{ $s->noseal ?: 'Belum diisi EXIM' }}</dd>
+                <dt>No. seal</dt><dd class="sg-mono">{{ $s->noseal ?: '-' }}</dd>
             </dl>
             {{-- LCL tidak punya no. container: tidak perlu diisi --}}
             @unless ($s->contno || $s->is_lcl)

@@ -1311,7 +1311,6 @@
                     && !outForm.querySelector('[data-load-missing]') && people('gate_loaders') && people('gate_guards')),
                 seal: !!sealPanel && boxes.length > 0 && boxes.every(b => b.checked)
                     && Array.from(sealPanel.querySelectorAll('[data-person] input[type=hidden]')).every(i => i.value.trim() !== '')
-                    && !sealPanel.querySelector('[data-field="noseal"] .sg-alert')
                     && (!mediaOf('out_media') || !mediaOf('out_media').missing().length)
                     && pads.every(p => !p.empty()),
                 out: false,

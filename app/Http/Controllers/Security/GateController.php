@@ -1289,14 +1289,8 @@ class GateController extends Controller
             $rules["{$col}_nrk"] = ($final ? 'required' : 'nullable') . '|string|max:100';
             $messages["{$col}_nrk.required"] = 'Scan ID card ' . Str::lower($label) . '.';
         }
-        $validator = Validator::make($request->all(), $rules, $messages);
-        $validator->after(function ($validator) use ($cont, $final) {
-            // truk LCL: seal per truk, cukup diisi EXIM di salah satu SP
-            if ($final && trim((string) $this->tripSeal($cont)) === '') {
-                $validator->errors()->add('noseal', 'No. seal belum diisi EXIM di shipment plan. Hubungi EXIM.');
-            }
-        });
-        $v = $validator->validate();
+        // no. seal dari EXIM tidak wajib untuk catat keluar (hanya ditampilkan sebagai informasi kalau ada)
+        $v = Validator::make($request->all(), $rules, $messages)->validate();
 
         $data = [
             'gate_seal_check' => !empty($v['seal_check']) ? json_encode(array_values($v['seal_check'])) : null,

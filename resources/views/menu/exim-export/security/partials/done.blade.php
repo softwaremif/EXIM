@@ -127,7 +127,7 @@
             @if (!$s->is_lcl || $s->contno_fmt)
                 <dt>Container</dt><dd class="sg-mono">{{ $s->contno_fmt ?: '-' }}</dd>
             @endif
-            <dt>No. seal</dt><dd class="sg-mono">{{ $s->noseal ?: 'Belum diisi EXIM' }}</dd>
+            <dt>No. seal</dt><dd class="sg-mono">{{ $s->noseal ?: '-' }}</dd>
             <dt>Shipment</dt><dd class="sg-mono">{{ $s->idship }}</dd>
             <dt>Buyer</dt><dd>{{ $s->buyer ?: '-' }}</dd>
             <dt>Plat</dt><dd class="sg-mono">{{ $s->nopol ?: '-' }}</dd>
