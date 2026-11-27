@@ -1,5 +1,7 @@
 @php
     $hasSel = (bool) $selected;
+    // awalan nama file salinan foto di perangkat (saveMediaCopy): no. container / plat
+    $mediaName = $hasSel ? trim(preg_replace('/[^A-Za-z0-9-]+/', '-', ($selected->ident ?? '') ?: 'cont' . $selected->contpk), '-') : 'security';
     $listUrl = route('security.gate.index', array_filter(['filter' => $filter, 'q' => $q]));
 @endphp
 <!doctype html>
@@ -52,6 +54,11 @@
             </a>
         @endif
         <button type="button" class="sg-btn sg-btn--ghost sg-btn--icon" data-stf-open aria-label="Scan QR container stuffing" title="Scan stuffing">@include('menu.exim-export.security.partials.icon', ['name' => 'qr'])</button>
+        {{-- salinan foto / video yang diunggah ikut diunduh ke folder Download perangkat (saveMediaCopy di bawah) --}}
+        <button type="button" class="sg-btn sg-btn--ghost sg-btn--icon" id="btnMediaCopy" aria-pressed="true" aria-label="Matikan simpan foto ke perangkat" title="Simpan foto ke perangkat: nyala">
+            <span data-copy-icon="on">@include('menu.exim-export.security.partials.icon', ['name' => 'download'])</span>
+            <span data-copy-icon="off" hidden>@include('menu.exim-export.security.partials.icon', ['name' => 'download-off'])</span>
+        </button>
         {{-- suara dialog konfirmasi / alert, disimpan per perangkat (dialogSound di bawah) --}}
         <button type="button" class="sg-btn sg-btn--ghost sg-btn--icon" id="btnSound" aria-pressed="true" aria-label="Matikan suara dialog" title="Suara dialog: nyala">
             <span data-sound-icon="on">@include('menu.exim-export.security.partials.icon', ['name' => 'sound'])</span>
@@ -483,6 +490,54 @@
         if (on) dialogSound('question', true);   // contoh suara konfirmasi saat dinyalakan
     });
     syncSoundBtn();
+
+    // ---------- salinan foto / video ke perangkat ----------
+    // Setiap foto / video yang berhasil diunggah ikut diunduh ke folder Download (tampil di galeri, album Download),
+    // sebagai cadangan di tablet. On/off per perangkat (localStorage 'media-copy'); default nyala di tablet / HP,
+    // mati di komputer. Nama file: <container>_<jenis>_<tanggal-jam>.<ext>
+    const MEDIA_NAME = @json($mediaName);
+    const copyOn = () => {
+        let v = null;
+        try { v = localStorage.getItem('media-copy'); } catch (e) {}
+        return v ? v === 'on' : window.matchMedia('(pointer: coarse)').matches;
+    };
+    const copyBtn = document.getElementById('btnMediaCopy');
+    const syncCopyBtn = () => {
+        const on = copyOn();
+        copyBtn.querySelector('[data-copy-icon="on"]').hidden = !on;
+        copyBtn.querySelector('[data-copy-icon="off"]').hidden = on;
+        copyBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        copyBtn.setAttribute('aria-label', on ? 'Matikan simpan foto ke perangkat' : 'Nyalakan simpan foto ke perangkat');
+        copyBtn.title = on ? 'Simpan foto ke perangkat: nyala' : 'Simpan foto ke perangkat: mati';
+    };
+    copyBtn.addEventListener('click', () => {
+        const on = !copyOn();
+        try { localStorage.setItem('media-copy', on ? 'on' : 'off'); } catch (e) {}
+        syncCopyBtn();
+        sgAlert(on ? 'Foto & video yang diunggah akan ikut tersimpan di folder Download perangkat ini (tampil di galeri, album Download).'
+            : 'Foto & video tidak lagi disimpan ke perangkat ini. Data tetap tersimpan di server.',
+            { type: on ? 'success' : 'question', title: on ? 'Simpan ke perangkat nyala' : 'Simpan ke perangkat mati' });
+    });
+    syncCopyBtn();
+    function saveMediaCopy(kind, blob, extra) {
+        if (!copyOn() || !blob) return;
+        try {
+            const p = n => String(n).padStart(2, '0'), d = new Date();
+            const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+            const type = blob.type || '';
+            const ext = type.includes('png') ? 'png' : type.includes('webm') ? 'webm' : type.includes('quicktime') ? 'mov'
+                : type.startsWith('video') ? 'mp4' : 'jpg';
+            const what = String(kind).replace(/^out_/, '') + (extra && extra.slot ? '-' + extra.slot : '');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${MEDIA_NAME}_${what}_${stamp}.${ext}`;
+            a.hidden = true;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+        } catch (e) {}   // gagal menyimpan salinan tidak mengganggu upload
+    }
 
     // ---------- dialog konfirmasi / pemberitahuan (pengganti confirm() & alert() browser) ----------
     // sgConfirm(pesan, { title, type, okText, cancelText }) -> Promise<boolean>; sgAlert(pesan, { title, type }) -> Promise
@@ -1067,6 +1122,7 @@
             last = await post(url, fd);
             onProgress((i + 1) / total);
         }
+        saveMediaCopy(kind, blob, extra);
         return last;
     }
 

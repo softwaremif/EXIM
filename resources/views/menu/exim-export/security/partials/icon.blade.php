@@ -30,6 +30,7 @@
     @case('dock')<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>@break
     @case('upload')<path d="M12 16V4M7 9l5-5 5 5M5 20h14"/>@break
     @case('download')<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>@break
+    @case('download-off')<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/><path d="M4 4l16 16"/>@break
     @case('sidebar')<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>@break
 @endswitch
 </svg>
