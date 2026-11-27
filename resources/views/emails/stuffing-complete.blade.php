@@ -18,8 +18,7 @@
                 <p style="margin:0 0 12px;font-size:14px;">Halo {{ $pic->login }},</p>
                 <p style="margin:0 0 16px;font-size:14px;line-height:1.5;">
                     Shipment berikut <b>sudah 100% stuffing</b> (semua carton sudah discan masuk container),
-                    tetapi statusnya masih <b>Confirm</b>. Mohon segera lengkapi No. Seal container dan Upload foto terkait,
-                    agar status berubah menjadi <b>Complete</b>.
+                    Mohon segera ubah menjadi status <b>Complete</b>.
                 </p>
 
                 <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
