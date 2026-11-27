@@ -52,8 +52,8 @@
         </li>
     @endforeach
 </ol>
-{{-- ?sp= (pilih SP ceklis carton truk LCL) membuka tab Muat --}}
-<div class="sg-main" id="doneMain" data-start-tab="{{ $s->departed_at && !request()->filled('sp') ? 'in' : 'load' }}">
+{{-- ?sp= (pilih SP ceklis carton truk LCL) membuka tab Muat; ?tab= membuka tab tertentu (mis. out dari halaman Pintu) --}}
+<div class="sg-main" id="doneMain" data-start-tab="{{ !$s->departed_at && array_key_exists((string) request('tab'), $tabs) ? request('tab') : ($s->departed_at && !request()->filled('sp') ? 'in' : 'load') }}">
     @unless ($ready)
         <div class="sg-alert sg-alert--warn" role="status">
             @include('menu.exim-export.security.partials.icon', ['name' => 'warn'])

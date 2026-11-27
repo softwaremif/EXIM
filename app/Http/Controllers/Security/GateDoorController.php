@@ -6,6 +6,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -13,10 +14,21 @@ use Illuminate\Validation\Rule;
  *  - aktifkan  container masuk ke pintu di pos MIF security (juga "terima" container pindahan)
  *  - pindah    container pindah ke MIF lain, cukup dicatat jamnya (dari pintu, atau dari area tanpa pintu)
  *  - batal     salah pilih pintu: kunjungan ditutup tanpa dianggap pindah
+ *  - selesai   selesai muat: truk meninggalkan pintu (pintu kosong untuk truk lain), menunggu gate out di pabrik
+ *  - keluar    keluar cepat dengan jam pilihan tanpa proses gate out, hanya urutan jam yang dicek (quickOut)
  * Keluar pabrik (gate out) menutup kunjungan otomatis di GateController::checkout.
  */
 class GateDoorController extends GateController
 {
+    // alasan keluar cepat (halaman Pintu); "Lainnya" wajib diberi catatan
+    const QUICK_OUT_REASONS = [
+        'Truk keluar tanpa dicatat di sistem',
+        'Tablet / sistem bermasalah saat truk keluar',
+        'Pintu dibutuhkan truk lain',
+        'Batal muat',
+        'Lainnya',
+    ];
+
     // halaman Pintu (ikon di header): papan pintu per MIF, container menuju / menunggu pintu, riwayat hari ini
     public function board()
     {
@@ -126,6 +138,78 @@ class GateDoorController extends GateController
         $this->closeVisit($cont->contpk, 'batal', now());
 
         return response()->json(['success' => true, 'message' => "Pintu {$active->pintu} MIF {$active->mif} dikosongkan."]);
+    }
+
+    public function finish(Request $request, $contpk)
+    {
+        $cont = $this->stuffableCont($contpk);
+        $active = DB::table(self::STUFFING_TABLE)->where('contpk', $cont->contpk)->where('aktif', 1)->first();
+        abort_unless($active, 422, 'Container ini tidak sedang di pintu.');
+        $this->ensurePos((int) $active->mif);
+        $this->closeVisit($cont->contpk, 'selesai', now());
+
+        return response()->json(['success' => true, 'message' => "Selesai muat. Pintu {$active->pintu} MIF {$active->mif} kosong, container menunggu gate out."]);
+    }
+
+    /**
+     * Keluar cepat dari halaman Pintu: truk sudah masuk lewat sistem tapi keluar tanpa proses gate out, pintu perlu
+     * dipakai truk lain. Hanya jam keluar yang dicek (urut setelah gate in / mulai muat / tutup container, tidak di masa
+     * depan); data seal, foto/video & tanda tangan tidak diperiksa. Alasan (wajib) & catatan masuk riwayat lokasi.
+     */
+    public function quickOut(Request $request, $contpk)
+    {
+        abort_unless($this->gateColumnsReady(), 503, 'Kolom gate pada table cont belum lengkap. Hubungi IT.');
+        $v = $request->validate([
+            'gate_out_at' => 'required|date',
+            'alasan'      => ['required', Rule::in(self::QUICK_OUT_REASONS)],
+            'catatan'     => 'nullable|required_if:alasan,Lainnya|string|max:180',
+        ], [
+            'gate_out_at.required' => 'Pilih jam keluar.',
+            'gate_out_at.date'     => 'Jam keluar tidak valid.',
+            'alasan.required'      => 'Pilih alasan keluar.',
+            'alasan.in'            => 'Alasan keluar tidak valid.',
+            'catatan.required_if'  => 'Alasan Lainnya: isi catatan keluar.',
+            'catatan.max'          => 'Catatan maksimal 180 karakter.',
+        ]);
+        $cont = $this->truckCont($contpk);
+        abort_if(empty($cont->actcontdate), 422, 'Kedatangan container ini belum tercatat (gate in).');
+        abort_if(!empty($cont->gate_out_at), 422, 'Container ini sudah tercatat keluar.');
+        $last = $this->doorsReady()
+            ? DB::table(self::STUFFING_TABLE)->where('contpk', $cont->contpk)->orderByDesc('stfpk')->first()
+            : null;
+        if ($last) {
+            $this->ensurePos((int) $last->mif);
+        }
+        $at = $this->chosenExitTime($request, $cont);
+        // riwayat lokasi: "Keluar cepat · <alasan>: <catatan>" (kolom catatan maks. 255)
+        $text = trim(preg_replace('/\s+/', ' ', (string) ($v['catatan'] ?? '')));
+        $note = Str::limit('Keluar cepat · ' . $v['alasan'] . ($text !== '' ? ': ' . $text : ''), 255, '');
+        // posisi terakhir (untuk baris riwayat kalau truk tidak sedang di pintu)
+        $mif = $last ? (int) ($last->status === 'pindah' && $last->tujuan_mif ? $last->tujuan_mif : $last->mif) : $this->posMif();
+
+        DB::transaction(function () use ($cont, $at, $last, $note, $mif) {
+            DB::table('cont')->where('contpk', $cont->contpk)->update(['gate_out_at' => $at, 'gate_out_userpk' => Session::get('userpk')]);
+            $this->syncTrip($cont->contpk);
+            // masih di pintu: kunjungan ditutup "keluar" dengan catatan; tidak di pintu (selesai muat / area factory):
+            // baris riwayat baru "keluar" tanpa pintu supaya catatan tetap tercatat di riwayat lokasi
+            if (!$this->closeVisit($cont->contpk, 'keluar', $at, ['catatan' => $note]) && $mif && $this->doorsReady()) {
+                DB::table(self::STUFFING_TABLE)->insert([
+                    'contpk'        => $cont->contpk,
+                    'exportpk'      => $cont->exportpk,
+                    'mif'           => $mif,
+                    'pintu'         => 0,
+                    'masuk_at'      => $last && $last->keluar_at ? $last->keluar_at : $at,
+                    'masuk_userpk'  => Session::get('userpk'),
+                    'keluar_at'     => $at,
+                    'keluar_userpk' => Session::get('userpk'),
+                    'status'        => 'keluar',
+                    'catatan'       => $note,
+                    'aktif'         => null,
+                ]);
+            }
+        });
+
+        return response()->json(['success' => true, 'message' => 'Keluar tersimpan (' . $at->isoFormat('D MMM HH:mm') . ').']);
     }
 
     // container sudah gate in, lulus pemeriksaan, belum keluar pabrik

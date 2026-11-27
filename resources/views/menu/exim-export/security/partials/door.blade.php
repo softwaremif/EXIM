@@ -13,7 +13,7 @@
     $canMove = $open && $from !== null && ($posMif === null || $posMif === $from);
     $canActivate = $open && !$st->active;
     $activateMifs = $canActivate ? ($posMif !== null ? [$posMif] : array_keys($gate::DOORS)) : [];
-    $statusText = ['aktif' => 'Di pintu', 'pindah' => 'Pindah', 'keluar' => 'Keluar pabrik', 'batal' => 'Dibatalkan'];
+    $statusText = ['aktif' => 'Di pintu', 'pindah' => 'Pindah', 'keluar' => 'Keluar pabrik', 'batal' => 'Dibatalkan', 'selesai' => 'Selesai muat'];
 @endphp
 <section class="sg-section sg-door" id="sec-door" data-panel="load" data-door
     data-activate-url="{{ route('security.gate.door.activate', $s->contpk) }}"
@@ -37,6 +37,9 @@
             @elseif ($st->active)
                 <strong>MIF {{ $st->active->mif }} · Pintu {{ $st->active->pintu }}</strong>
                 <span>Sejak {{ $st->active->masuk->format('H:i') }} ({{ $since($st->active->masuk) }})</span>
+            @elseif (!empty($st->finished))
+                <strong>Selesai muat · MIF {{ $st->last->mif }}</strong>
+                <span>Keluar dari pintu {{ $st->last->pintu }} jam {{ $st->last->keluar->format('H:i') }} · menunggu gate out</span>
             @elseif ($st->transit)
                 <strong>Pindah ke MIF {{ $st->last->tujuan_mif }}</strong>
                 <span>Dari MIF {{ $st->last->mif }} jam {{ $st->last->keluar->format('H:i') }} · belum masuk pintu</span>

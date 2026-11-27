@@ -998,6 +998,22 @@ class GateController extends Controller
     }
 
     // jam keluar container lulus = waktu foto container keluar (wajar: setelah tiba, tidak di masa depan)
+    // jam keluar pilihan: tidak di masa depan, tidak sebelum gate in / mulai muat / tutup container
+    protected function chosenExitTime(Request $request, $cont): Carbon
+    {
+        $request->validate(['gate_out_at' => 'date'], ['gate_out_at.date' => 'Jam keluar tidak valid.']);
+        $at = Carbon::parse($request->input('gate_out_at'))->second(0);
+        if ($at->gt(now()->addMinute())) {
+            throw ValidationException::withMessages(['gate_out_at' => ['Jam keluar tidak boleh lebih dari jam sekarang.']]);
+        }
+        foreach (['actcontdate' => 'gate in', 'gate_load_at' => 'mulai muat', 'gate_close_at' => 'tutup container'] as $col => $label) {
+            if (!empty($cont->$col) && $at->lt(Carbon::parse($cont->$col)->second(0))) {
+                throw ValidationException::withMessages(['gate_out_at' => ["Jam keluar tidak boleh sebelum jam {$label} (" . Carbon::parse($cont->$col)->isoFormat('D MMM HH:mm') . ').']]);
+            }
+        }
+        return $at;
+    }
+
     protected function exitTime($cont): Carbon
     {
         $at = $this->outMedia($cont)['out_exit_at'];
@@ -1697,6 +1713,7 @@ class GateController extends Controller
             'active'   => $active ? $history->firstWhere('stfpk', $active->stfpk) : null,
             'mif'      => $mif,
             'transit'  => !$active && $last && $last->status === 'pindah',
+            'finished' => !$active && $last && $last->status === 'selesai',
             'last'     => $last ? $history->first() : null,
             'history'  => $history,
             'occupied' => $occupied,
@@ -1722,7 +1739,7 @@ class GateController extends Controller
 
         $board = ['unplaced' => []];
         foreach (self::DOORS as $mif => $count) {
-            $board[$mif] = ['doors' => array_fill_keys(range(1, $count), null), 'incoming' => [], 'waiting' => []];
+            $board[$mif] = ['doors' => array_fill_keys(range(1, $count), null), 'incoming' => [], 'waiting' => [], 'done' => []];
         }
         $item = fn($r, $at) => (object) [
             'contpk' => $r->contpk, 'ident' => $this->identOf($r), 'pintu' => (int) ($r->pintu ?? 0), 'from' => (int) ($r->mif ?? 0),
@@ -1758,6 +1775,11 @@ class GateController extends Controller
             $v = $last->get($r->contpk);
             if ($v && $v->status === 'pindah') {
                 continue;   // sudah tampil di "menuju MIF"
+            }
+            // selesai muat, sudah meninggalkan pintu: menunggu gate out
+            if ($v && $v->status === 'selesai' && isset($board[(int) $v->mif])) {
+                $board[(int) $v->mif]['done'][] = $item($v, $v->keluar_at);
+                continue;
             }
             $mif = $v ? (int) $v->mif : $this->posMif($gateLogins[$r->gate_userpk] ?? null);
             $entry = $item($r, $r->actcontdate);
@@ -1799,6 +1821,7 @@ class GateController extends Controller
                     'pindah' => 'Pindah ke MIF ' . $r->tujuan_mif . ((int) $r->pintu ? '' : ' (tanpa pintu)'),
                     'keluar' => 'Keluar pabrik',
                     'batal'  => 'Pintu dikosongkan (salah pilih)',
+                    'selesai' => 'Selesai muat, keluar dari pintu',
                 ][$r->status] ?? $r->status;
                 $events[] = $base + ['at' => Carbon::parse($r->keluar_at), 'kind' => $r->status, 'text' => $text, 'by' => $logins[$r->keluar_userpk] ?? null, 'note' => $r->catatan];
             }

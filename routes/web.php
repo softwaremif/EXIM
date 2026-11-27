@@ -141,6 +141,10 @@ Route::middleware(['check'])->group(function () {
     Route::post('/security/gate/{contpk}/door', [GateDoorController::class, 'activate'])->name('security.gate.door.activate');
     Route::post('/security/gate/{contpk}/door/move', [GateDoorController::class, 'move'])->name('security.gate.door.move');
     Route::post('/security/gate/{contpk}/door/cancel', [GateDoorController::class, 'cancel'])->name('security.gate.door.cancel');
+    // selesai muat: truk meninggalkan pintu (pintu kosong), masih di pabrik menunggu gate out
+    Route::post('/security/gate/{contpk}/door/finish', [GateDoorController::class, 'finish'])->name('security.gate.door.finish');
+    // keluar cepat dari halaman Pintu: pilih jam keluar (dicek urutannya) lalu langsung simpan, tanpa data gate out
+    Route::post('/security/gate/{contpk}/door/out', [GateDoorController::class, 'quickOut'])->name('security.gate.door.out');
     // ceklis carton per container (data di Packing List, lewat API)
     Route::get('/security/gate/{contpk}/cartons', [GateController::class, 'cartons'])->name('security.gate.cartons');
     Route::get('/security/gate/{contpk}/cartons/detail', [GateController::class, 'cartonDetail'])->name('security.gate.cartons.detail');
