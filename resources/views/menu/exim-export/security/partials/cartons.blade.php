@@ -198,8 +198,8 @@
         <div class="ck-prog-text"><span data-prog-text>Memuat carton...</span><span data-prog-pct></span></div>
         <div class="ck-mifbar" data-mifbar hidden></div>
         <div class="ck-stats">
-            <button type="button" class="ck-stat is-scan" data-open="scanned"><b data-n="scanned">-</b><span>Siap diceklis</span></button>
             <button type="button" class="ck-stat" data-open="pending"><b data-n="pending">-</b><span>Belum discan stuffing</span></button>
+            <button type="button" class="ck-stat is-scan" data-open="scanned"><b data-n="scanned">-</b><span>Siap diceklis</span></button>
             <button type="button" class="ck-stat is-ok" data-open="checked"><b data-n="checked">-</b><span>Sudah diceklis</span></button>
         </div>
         <div class="sg-alert sg-alert--danger" id="ckCardAlert" role="alert" hidden>
@@ -277,9 +277,9 @@
             </div>
         </div>
         <div class="ck-legend">
+            <span><i style="background:var(--surface-sunken);border-color:var(--line-strong);border-style:dashed"></i>Belum discan stuffing</span>
             <span><i style="background:var(--info-soft);border-color:var(--info)"></i>Siap diceklis</span>
             <span><i style="background:var(--ok-soft);border-color:var(--ok)"></i>Sudah diceklis</span>
-            <span><i style="background:var(--surface-sunken);border-color:var(--line-strong);border-style:dashed"></i>Belum discan stuffing</span>
         </div>
     </div>
 </div>
@@ -328,7 +328,7 @@
     const DONE = ['checked', 'locked', 'old'];
     const STATE = { scanned: 'Siap diceklis', pending: 'Belum discan stuffing', checked: 'Sudah diceklis', locked: 'Diceklis · terkunci', old: 'Sudah masuk (data lama)' };
     // [key, label, warna titik] -- warna sama dengan tile & keterangan di bawah
-    const TABS = [['scanned', 'Siap diceklis', 'var(--info)'], ['pending', 'Belum discan', 'var(--line-strong)'], ['checked', 'Sudah diceklis', 'var(--ok)'], ['all', 'Semua', '']];
+    const TABS = [['pending', 'Belum discan', 'var(--line-strong)'], ['scanned', 'Siap diceklis', 'var(--info)'], ['checked', 'Sudah diceklis', 'var(--ok)'], ['all', 'Semua', '']];
     let mifFilter = ''; // '' = semua MIF
     let data = null, tab = 'scanned', busy = false, loadingP = null, syncedAt = null, lastErr = '', lastMsg = '';
     let selectMode = false, lastRows = [];
